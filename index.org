@@ -1,0 +1,1051 @@
+#+setupfile: Setup.org
+#+title: Reagent Flow
+#+subtitle: A ClojureScript library that wraps [[https://reactflow.dev/][ReactFlow]]
+
+[[https://img.shields.io/clojars/v/reagent-flow?include_prereleases&style=flat-square.svg]]
+
+
+* Usage
+
+You can mostly follow the [[https://reactflow.dev/docs/][ReactFlow documentation]] and be sure to replace
+"react" with "reagent" and use ~snake-casing~ instead of ~kebabCasing~.
+There are some exceptions.
+
+- Types are prefixed with ~Flow~ and uses the original ~camelCasing~.
+  We recommend using the keyword equivalent instead though, so you
+  could ignore types altogether.
+
+- The parameters received in ~node-types~ & ~edge-types~ are unchanged, so
+  if you want to use them you should apply
+  ~(js->clj props :keywordize-keys true)~.
+  A nice pattern, is to only rely on the ~id~ from the parameters and do
+  look-ups in your state manually.
+#+begin_example clojurescript
+(defn- custom-node [{:keys [id] :as props}]
+     (let [node (flow/get-node-by-id @nodes id)
+           data (:data node)]
+       [:p (:label data)])
+#+end_example
+
+- Hooks are avoided. You manage state with atoms however you please
+  and there are events to listen for viewport-changes on the main
+  component; ~reagent-flow~.
+
+/Please examine the examples below to get a better grasp of these differences./
+
+
+* Examples
+:properties:
+:header-args: :mkdirp yes :results silent
+:end:
+
+** Custom Nodes
+
+Connect the nodes, pick a color and see the nodes change interactively.
+#+html: <div class="example">
+#+begin_src clojurescript :tangle babel/examples/src/custom_nodes/core.cljs :exports none
+(ns custom-nodes.core
+  (:require
+   [reagent.core :as r]
+   [reagent.dom :as rdom]
+   [reagent-flow.core
+    :refer [add-edge apply-edge-changes apply-node-changes
+            background handle reagent-flow
+            get-connections-by-node-id get-node-by-id]]))
+#+end_src
+
+We use atoms to store nodes & edges. The nodes you see here with the
+~types~ parameter are custom nodes.
+#+begin_src clojurescript  :tangle babel/examples/src/custom_nodes/core.cljs
+(defonce nodes
+  (r/atom [{:id          :explanation
+            :connectable false
+            :draggable   false
+            :selectable  false
+            :position    {:x 0 :y 0}
+            :data        {:label "Pick a color & connect the nodes"}}
+           {:id              :c1
+            :type            :color-node
+            :className       :color-node
+            :position        {:x 60 :y 60}
+            :data            {:color "#e6d5d0"}
+            :source-position :right}
+           {:id              :p2
+            :type            :preview-node
+            :position        {:x 300 :y 300}
+            :data            {:label "Preview color"}
+            :target-position :left}]))
+
+(defonce edges
+  (r/atom []))
+#+end_src
+
+This is the code for the color-node. Note that we use ~get-node-by-id~.
+This will return the node with an associated index, so that we can
+make changes to our atom above.
+#+begin_src clojurescript  :tangle babel/examples/src/custom_nodes/core.cljs
+(defn color-node [{:keys [id data]}]
+  (let [node          (get-node-by-id @nodes id)
+        default-color (-> data :color)]
+    (letfn [(handle-change [event]
+              (let [color (-> event .-target .-value)
+                    path  [(:index node) :data]]
+                (swap! nodes update-in path assoc :color color)))]
+      (fn [{is-connectable :isConnectable}]
+        (let [node  (get-node-by-id @nodes id)
+              color (-> node :data :color)]
+          [:<>
+           [:input {:class         [:nodrag :color-picker] 
+                    :type          :color
+                    :on-change     handle-change
+                    :value         color
+                    :default-value default-color}]
+           [handle {:type           :source
+                    :position       :right
+                    :id             :a
+                    :is-connectable is-connectable}]])))))
+#+end_src
+
+As with the color-node, the preview-node uses the ~isConnected~
+parameter. Note that it doesn't follow idiomatic Clojure naming as the
+rest of ReagentFlow. This is due to ReactFlow calling our function directly.
+#+begin_src clojurescript  :tangle babel/examples/src/custom_nodes/core.cljs
+(defn preview-node [{id             :id
+                     is-connectable :isConnectable}]
+  (let [node            (get-node-by-id @nodes id)
+        {:keys [label]} (:data node)
+        connection      (first (get-connections-by-node-id @edges id))
+        source          (get-node-by-id @nodes (:source connection))
+        color           (-> source :data :color)]
+    [:<>
+     [:div {:style (merge {:background-color :white
+                           :display          :flex
+                           :align-items      :center
+                           :justify-content  :center
+                           :width            :10em
+                           :height           :5em
+                           :border-radius    :5px
+                           :border           "1px solid black"}
+                          (when connection {:background-color color}))}
+      [:strong {:style {:color  color
+                        :filter "invert(100%) grayscale(1)"}} label]]
+     [handle {:type           :target
+              :position       :left
+              :id             :b
+              :is-connectable is-connectable}]]))
+
+(defonce node-types
+  {:color-node   color-node
+   :preview-node preview-node})
+#+end_src
+
+As with ReactFlow, we need to define our event-handlers outside of
+it's render-loop.
+#+begin_src clojurescript  :tangle babel/examples/src/custom_nodes/core.cljs
+(defn- main []
+  (letfn [(handle-node-changes [changes]
+            (reset! nodes (apply-node-changes changes @nodes)))
+          (handle-edge-changes [changes]
+            (reset! edges (apply-edge-changes changes @edges)))
+          (handle-connect [connection]
+            (reset! edges (add-edge connection @edges)))]
+    (fn []
+      [reagent-flow {:nodes                @nodes
+                     :edges                @edges
+                     :node-types           node-types
+                     :fit-view             true
+                     :on-nodes-change      handle-node-changes
+                     :on-edges-change      handle-edge-changes
+                     :on-connect           handle-connect
+                     :connection-line-type :smoothstep
+                     :default-edge-options {:animated true
+                                            :type :smoothstep}}
+       [background]])))
+
+#+end_src
+
+#+begin_src clojurescript  :tangle babel/examples/src/custom_nodes/core.cljs :exports none
+(defn ^:export init [element]
+  (rdom/render [main] element))
+
+(defn ^:export unload [element]
+  (rdom/unmount-component-at-node element))
+#+end_src
+#+html: <div class="output" data-src="custom_nodes"></div>
+#+html: </div>
+
+
+** Drop it like it’s hot
+
+Drag & drop nodes from a top panel and onto the graph. Edges can be
+connected and disconnected per usual.
+#+html: <div class="example">
+#+begin_src clojurescript :tangle babel/examples/src/drop_it_like_its_hot/core.cljs :exports none
+(ns drop-it-like-its-hot.core
+  (:require
+   [reagent.core :as r]
+   [reagent.dom :as rdom]
+   [reagent-flow.core
+    :refer [add-edge apply-edge-changes apply-node-changes
+            background reagent-flow reagent-flow-provider
+            use-on-viewport-change
+            get-node-by-id]]))
+#+end_src
+
+#+begin_src clojurescript  :tangle babel/examples/src/drop_it_like_its_hot/core.cljs
+(defonce node-id
+  (r/atom 0))
+
+(defonce nodes
+  (r/atom [{:id          "explanation"
+            :selectable  false
+            :connectable false
+            :draggable   false
+            :position    {:x 0 :y 0}
+            :data        {:label "Drag some nodes in from the panel above"}}]))
+
+(defonce edges
+  (r/atom []))
+#+end_src
+
+Here you can note the use of ~on-viewport-change~ which is not part of the
+original ReactFlow component. In ReactFlow, this is available as a
+hook, but we try to avoid hooks for simplicity. The handler receives a
+map with ~x~, ~y~ & ~zoom~ values, just as the hook equivalent.
+#+begin_src clojurescript  :tangle babel/examples/src/drop_it_like_its_hot/core.cljs
+(defn- main []
+  (let [flow      (atom nil)
+        viewport  (r/atom {:x 0 :y 0 :zoom 1})
+        data-type "application/reagentflow"]
+    (letfn [(handle-drag [event]
+              (let [data-transfer (-> event .-dataTransfer)]
+                (.setData data-transfer data-type "default")
+                (set! (-> data-transfer .-effectAllowed) "move")))
+            (handle-node-changes [changes]
+              (reset! nodes (apply-node-changes changes @nodes)))
+            (handle-edge-changes [changes]
+              (reset! edges (apply-edge-changes changes @edges)))
+            (handle-connect [connection]
+              (reset! edges (add-edge connection @edges)))
+            (handle-drop [event]
+              (.preventDefault event)
+              (when-let [node-type (.getData (-> event .-dataTransfer) data-type)]
+                (let [flow-el (-> flow .-state .-firstChild) 
+                      rect    (.getBoundingClientRect flow-el)
+                      x (- (- (.-clientX event) rect.left) (:x @viewport))
+                      y (- (- (.-clientY event) rect.top) (:y @viewport))]
+                  (swap! node-id inc)
+                  (swap! nodes conj {:id       (str "node-" @node-id)
+                                     :type     node-type
+                                     :position {:x x :y y}
+                                     :data     {:label (str "Node #" @node-id)}}))))
+            (handle-drag-over [event]
+              (.preventDefault event)
+              (set! (-> event .-dataTransfer .-dropEffect) "move"))]
+      (fn []
+        [:<>
+         [:menu.node-palette
+          [:div.node {:draggable     true
+                      :on-drag-start handle-drag} "Node"]]
+         [reagent-flow {:ref                  #(reset! flow %)
+                        :id                   :drop-it-like-its-hot
+                        :nodes                @nodes
+                        :edges                @edges
+                        :fit-view             true
+                        :on-nodes-change      handle-node-changes
+                        :on-edges-change      handle-edge-changes
+                        :on-connect           handle-connect
+                        :on-drop              handle-drop
+                        :on-drag-over         handle-drag-over
+                        :on-viewport-change   #(reset! viewport %)
+                        :connection-line-type :smoothstep
+                        :default-edge-options {:type :smoothstep}}
+          [background]]]))))
+#+end_src
+
+#+begin_src clojurescript  :tangle babel/examples/src/drop_it_like_its_hot/core.cljs :exports none
+(defn ^:export init [element]
+  (rdom/render [main] element))
+
+(defn ^:export unload [element]
+  (rdom/unmount-component-at-node element))
+#+end_src
+#+html: <div class="output" data-src="drop_it_like_its_hot"></div>
+#+html: </div>
+
+** TODO Stress                                                        :noexport:
+
+This example stresstests react-flow rendering in combination with
+reagent state-handling.
+#+html: <div class="example">
+#+begin_src clojurescript :tangle babel/examples/src/stress/core.cljs :exports none
+(ns stress.core
+  (:require
+   [reagent.core :as r]
+   [reagent.dom :as rdom]
+   [reagent-flow.core
+    :refer [add-edge apply-edge-changes apply-node-changes
+            background handle reagent-flow
+            get-connections-by-node-id get-node-by-id]]))
+#+end_src
+
+#+begin_src clojurescript  :tangle babel/examples/src/stress/core.cljs
+(def num-nodes 100)
+
+(defonce sum (r/atom 0))
+
+(defonce nodes
+  (let [rows 10]
+    (r/atom (into (->> (range 1 (inc num-nodes))
+                       (mapv (fn [idx]
+                               (let [x (+ 200 (* 200 (max 1 (mod idx rows))))
+                                     y (* 100 (max 1 (Math/round (Math/ceil (/ idx rows)))))]
+                                {:id       (str "node-" idx)
+                                 :position {:x x :y y}
+                                 :data     {:label (str "Node #" idx)
+                                            :value idx}}))))
+                  [{:id       :node-sum
+                    :position {:x 0 :y 0}
+                    :data     {:label (str "Sum: " @sum)}}]))))
+
+(defonce edges
+  (r/atom (into (->> (range (inc num-nodes))
+                     (mapv (fn [idx]
+                             {:id     (str "edge-" idx)
+                              :source (str "node-" (inc idx))
+                              :target (str "node-" idx)})))
+                [{:id     :edge-sum
+                  :source (str "node-" num-nodes)
+                  :target :node-sum}])))
+
+(defn- main []
+  (letfn [(handle-node-changes [changes]
+            (reset! nodes (apply-node-changes changes @nodes)))
+          (handle-edge-changes [changes]
+            (reset! edges (apply-edge-changes changes @edges)))
+          (handle-connect [connection]
+            (reset! edges (add-edge connection @edges)))]
+    (fn []
+      [reagent-flow {:id                   :stress
+                     :nodes                @nodes
+                     :edges                @edges
+                     :fit-view             true
+                     :on-nodes-change      handle-node-changes
+                     :on-edges-change      handle-edge-changes
+                     :on-connect           handle-connect
+                     :connection-line-type :smoothstep
+                     :default-edge-options {:animated true
+                                            :type     :smoothstep}}
+       [background]])))
+
+#+end_src
+
+#+begin_src clojurescript  :tangle babel/examples/src/stress/core.cljs :exports none
+(defn ^:export init [element]
+  (rdom/render [main] element))
+
+(defn ^:export unload [element]
+  (rdom/unmount-component-at-node element))
+#+end_src
+#+html: <div class="output" data-src="stress"></div>
+#+html: </div>
+
+
+** Examples manifests                                                 :noexport:
+
+*** Deps.edn
+#+begin_src clojure :tangle babel/examples/deps.edn
+{:deps  {org.clojure/clojurescript        {:mvn/version "1.11.51"}
+         reagent/reagent                  {:mvn/version "1.1.1"}
+         net.clojars.simtech/reagent-flow {:local/root "../"}}
+ :paths ["src"]
+ :aliases
+ {:shadow-cljs {:extra-deps {thheller/shadow-cljs {:mvn/version "2.20.20"}
+                             binaryage/devtools   {:mvn/version "1.0.6"}}
+                :main-opts  ["-m" "shadow.cljs.devtools.cli"]}}}
+#+end_src
+
+*** Shadow-cljs.edn
+#+begin_src clojure :tangle babel/examples/shadow-cljs.edn
+{:deps  true
+ :nrepl {:port 9001}
+ :builds
+ {:examples
+  {:modules
+   {:examples {:entries [custom-nodes.core
+                         drop-it-like-its-hot.core
+                         stress.core]}}
+   :target     :browser
+   :asset-path "js"
+   :output-dir "../../docs/js/"
+   :devtools   {:preloads  [devtools.preload]
+                :http-root "../../docs"
+                :http-port 3000}}}}
+#+end_src
+
+*** Package.json
+#+begin_src javascript :tangle babel/examples/package.json :noweb yes
+{
+    "private": true,
+    "type": "module",
+    "dependencies": {
+        "create-react-class": "^15.7.0",
+        "react":              "^17.0.2-0",
+        "react-dom":          "^17.0.2-0",
+        "reactflow":          "^<<version>>"
+    },
+    "devDependencies": {
+        "shadow-cljs": "^2.20.20"
+    }
+}
+#+end_src
+
+
+* Implementation                                                     :noexport:
+:properties:
+:header-args: :mkdirp yes :results silent
+:end:
+We use the same version-scheme as ReactFlow. You're currently viewing
+version:
+#+name: version
+#+begin_src text
+11.1.2
+#+end_src
+
+Here you'll find all the names of the classes, functions, hooks, and types of
+this version of ReactFlow listed.
+
+** Classes
+
+ #+name: classes
+- Background
+- BaseEdge
+- BezierEdge
+- ControlButton
+- Controls
+- EdgeText
+- Handle
+- Panel
+- Position
+- ReactFlow
+- ReactFlowProvider
+- SimpleBezierEdge
+- SmoothStepEdge
+- StepEdge
+- StraightEdge
+
+
+** Functions
+
+#+name: functions
+- boxToRect
+- getBezierPath 
+- getBoundsOfRects
+- getConnectedEdes
+- getIncomers
+- getMarkerEnd 
+- getOutgoers
+- getRectOfNodes
+- getSimpleBezierPath 
+- getSmoothStepPath 
+- getStraightPath 
+- getTransformFoBounds
+- internalsSymbol
+- isEdge
+- isNode
+- rectToBox
+- updateEdge
+
+
+** Hooks
+
+#+name: hooks
+- useReactFlow
+- useUpdateNodeInternals
+- useNodes
+- useEdges
+- useViewport
+- useKeyPress
+- useStore
+- useStoreApi
+- useOnViewportChange
+- useOnSelectionChange
+- useNodesInitialized
+- useNodesState 
+- useEdgesState 
+
+
+** Types
+
+#+name: types
+- Position
+- XYPosition 
+- XYZPosition 
+- Dimensions
+- Rect
+- Box
+- Transform
+- CoordinateExtent
+- Node
+- NodeMouseHandler 
+- NodeDragHandler 
+- SelectionDragHandler 
+- WrapNodeProps
+- NodeProps
+- NodeHandleBounds 
+- NodeDimensionUpdate 
+- NodeInternals 
+- NodeBounds 
+- NodeDragItem 
+- NodeOrigin 
+- ReactFlowJsonObject
+- Instance 
+- ReactFlowInstance
+- HandleType 
+- StartHandle 
+- HandleProps 
+- NodeTypes 
+- NodeTypesWrapped
+- EdgeTypes
+- EdgeTypesWrapped
+- FitView
+- Project
+- OnNodesChange
+- OnEdgesChange
+- OnNodesDelete
+- OnEdgesDelete
+- OnMove
+- OnMoveStart
+- OnMoveEnd
+- ZoomInOut
+- ZoomTo
+- GetZoom
+- GetViewport
+- SetViewport
+- SetCenter
+- FitBounds
+- OnInit
+- Connection
+- ConnectionMode 
+- OnConnect 
+- FitViewOptions 
+- OnConnectStartParams 
+- OnConnectStart 
+- OnConnectEnd 
+- Viewport 
+- KeyCode 
+- SnapGrid 
+- PanOnScrollMode 
+- ViewportHelperFunctionOptions 
+- SetCenterOptions 
+- FitBoundsOptions 
+- UnselectNodesAndEdgesParams 
+- OnViewportChange 
+- ViewportHelperFunctions 
+- ReactFlowStore 
+- ReactFlowActions 
+- ReactFlowState 
+- UpdateNodeInternals 
+- OnSelectionChangeParams 
+- OnSelectionChangeFunc 
+- PanelPosition 
+- ProOptions 
+- SmoothStepPathOptions 
+- BezierPathOptions 
+- Edge
+- DefaultEdgeOptions 
+- EdgeMouseHandler 
+- WrapEdgeProps
+- EdgeProps
+- BaseEdgeProps 
+- SmoothStepEdgeProps
+- BezierEdgeProps
+- EdgeTextProps 
+- ConnectionLineType 
+- ConnectionLineComponentProps 
+- ConnectionLineComponent 
+- OnEdgeUpdateFunc
+- EdgeMarker 
+- EdgeMarkerType 
+- MarkerType 
+- ReactFlowProps 
+- ReactFlowRefType 
+- NodeDimensionChange 
+- NodePositionChange 
+- NodeSelectionChange 
+- NodeRemoveChange 
+- NodeAddChange
+- NodeResetChange
+- NodeChange 
+- EdgeSelectionChange 
+- EdgeRemoveChange 
+- EdgeAddChange
+- EdgeResetChange
+- EdgeChange
+
+
+** TODO Process lists [0/2]
+
+Here the lists above are processed to get the ClojureScript equivalent functionality.
+
+- [ ] Augment symbols with modified documentation from their original
+  equivalent
+- [ ] Thorough reasoning if hooks should be exposed or not
+#+name: refer
+#+begin_src emacs-lisp :var classes=classes()[,0] functions=functions()[,0] hooks=hooks[,0]
+(s-join "\n" (-concat classes functions hooks))
+#+end_src
+
+#+name: adapted-classes
+#+begin_src emacs-lisp :var classes=classes()[,0]
+(->> classes
+     (--map
+      (format "(def %s%s (r/adapt-react-class %s))"
+              (if (equal it "ReactFlow")
+                  "^:private "
+                "")
+              (react->reagent it)
+              it))
+     (s-join "\n"))
+#+end_src
+
+#+name: defs
+#+begin_src emacs-lisp :var functions=functions()[,0] hooks=hooks[,0] types=types()[,0]
+(->>
+ (-concat 
+  (->> (sort (-concat functions hooks) 's-less?)
+       (--map (format "(def ^{:private true} %s %s)" (react->reagent it) (s-trim it))))
+  (--map (format "(def ^{:const true} Flow%s reactflow/%s)" (s-trim it) (s-trim it))
+         types))
+ (s-join "\n" ))
+#+end_src
+
+
+** Core
+
+With the lists processed, we assemble our core namespace by using
+these processed lists.
+#+begin_src clojurescript :tangle babel/src/reagent_flow/core.cljs :noweb yes
+<<preamble>>
+(ns ^{:doc "A ClojureScript library that wraps ReactFlow"}
+    reagent-flow.core
+  (:require
+   [clojure.string :as str]
+   [cljs.core :refer [IDeref IEditableCollection]]
+   [medley.core :refer [map-keys map-vals]]
+   [reagent.core :as r]
+   [reactflow$default :as ReactFlow]
+   [reactflow :as rf
+    :refer [addEdge
+            applyEdgeChanges
+            applyNodeChanges
+            <<refer()>>
+            ]]))
+
+<<adapted-classes()>>
+
+<<defs()>>
+#+end_src
+
+To create our main entry-point functions, we need a few private
+helper-functions:
+#+begin_src clojurescript  :tangle babel/src/reagent_flow/core.cljs :noweb yes
+(defn- ->params
+  "Normalize arguments to always have the form [props children] like
+   hiccup elements."
+  [args]
+  (cond-> args
+    (-> args first map? not) (conj nil)))
+
+(defn- ->kebab-case
+  "Convert string to kebab-casing.
+  
+   See: https://en.wikipedia.org/wiki/Letter_case#Kebab_case"
+  [snake]
+  (let [[start & rest] (str/split (name snake) #"-")]
+    (keyword (apply str start (map str/capitalize rest)))))
+
+(defn- ->snake-case
+  "Convert string to snake-casing.
+
+   See: https://en.wikipedia.org/wiki/Letter_case#Snake_case"
+  [kebab]
+  (-> (name kebab)
+      (str/replace #"[A-Z]" #(str "-" (str/lower-case %1)))
+      (keyword)))
+
+(defn- flowjs->clj [o]
+  (js->clj o :keywordize-keys true))
+
+(defn- flow-props->clj
+  "Convert JavaScript object into a map with idiomatic Clojure
+   snake-cased keys."
+  [props]
+  (->> (flowjs->clj props)
+       (map (fn [prop] (map-keys ->snake-case prop)))
+       (into [])))
+
+(defn- clj->flow-props
+  "Convert Clojure map into a JavaScript object with kebab-cased
+   keys."
+  [props]
+  (->> (map (fn [prop] (map-keys ->kebab-case prop)) props)
+       (clj->js)))
+
+(defn- apply-changes [f delta src]
+  (-> (f (clj->js delta) (clj->flow-props src))
+      (flow-props->clj)))
+
+(defn- react-flowify-component [types]
+  (clj->js ((partial map-vals r/reactify-component) types)))
+#+end_src
+
+We need reagent-flow to be a functional react-component in order to
+use hooks. We therefor have a private function by the name of
+~reagent-flow*~ which does most of the job and is later wrapped by a
+public function with the name ~reagent-flow~.
+We only rely on the ~use-on-viewport-change~-hook as we can manage all
+the other state directly via atoms.
+#+begin_src clojurescript  :tangle babel/src/reagent_flow/core.cljs :noweb yes
+(defn- reagent-flow*
+  [[on-viewport-change on-viewport-start on-viewport-end & args]]
+  (let [[params & children] (->params args)
+        node-types          (when-let [types (:node-types params)] (react-flowify-component types))
+        edge-types          (when-let [types (:edge-types params)] (react-flowify-component types))
+        on-nodes-change     (when-let [node-change (:on-nodes-change params)]
+                              (fn [delta] (node-change (flowjs->clj delta))))
+        on-edges-change     (when-let [edge-change (:on-edges-change params)]
+                              (fn [delta] (edge-change (flowjs->clj delta))))
+        on-connect          (when-let [connect (:on-connect params)]
+                              (fn [delta] (connect (flowjs->clj  delta ))))
+        params              (dissoc params :node-types :edge-types)]
+    (fn [[on-viewport-change on-viewport-start on-viewport-end & args]]
+      (let [[params & children] (->params args)
+            params              (merge (dissoc params :node-types :edge-types)
+                                       (map-vals clj->js params)
+                                       (when node-types {:node-types node-types})
+                                       (when edge-types {:edge-types edge-types})
+                                       (when on-nodes-change {:on-nodes-change on-nodes-change})
+                                       (when on-edges-change {:on-edges-change on-edges-change})
+                                       (when on-connect {:on-connect on-connect}))]
+        (when (or (some? on-viewport-change)
+                  (some? on-viewport-start)
+                  (some? on-viewport-end))
+          (use-on-viewport-change
+           (clj->js
+            (merge {}
+                   (when (some? on-viewport-change)
+                     {:onChange #(on-viewport-change (flowjs->clj %))})
+                   (when (some? on-viewport-start)
+                     {:onStart #(on-viewport-start (flowjs->clj %))})
+                   (when (some? on-viewport-end)
+                     {:onEnd #(on-viewport-end (flowjs->clj %))})))))
+        (into [react-flow params] children)))))
+#+end_src
+
+These are the only exposed functions of reagent-flow that differs from
+react-flow in other ways than just naming. Mostly just interop
+measures, so you won't have to convert data-structures all over your
+client-code.
+#+begin_src clojurescript  :tangle babel/src/reagent_flow/core.cljs :noweb yes
+(defn apply-node-changes
+  "Returns a vector of nodes with `changes` applied to the `source`."
+  [changes source]
+  (apply-changes applyNodeChanges changes source))
+
+(defn apply-edge-changes
+  "Returns a vector of edges with `changes` applied to the `source`."
+  [changes source]
+  (apply-changes applyEdgeChanges changes source))
+
+(defn add-edge
+  "Returns a vector of edges with `edge` added to the `source`."
+  [edge source]
+  (apply-changes addEdge edge source))
+
+(defn get-node-by-id
+  "Returns a map of the node with `id` from `nodes`. 
+   The returned map is supplemented with the keyword `index`.
+
+   Returns `nil` if the node is not found."
+  [nodes id]
+  (when (some? id)
+   (letfn [(item-with-id [idx itm]
+             (when (= (name id) (name (:id itm)))
+               (assoc itm :index idx)))]
+     (->> nodes
+          (keep-indexed item-with-id)
+          (first)))))
+
+(defn get-connections-by-node-id
+  "Returns a vector of connections where the node with `id` is either
+   the source or the target.
+
+   Returns an empty vector if no connections are found."
+  [connections id & which]
+  (let [which (or which [:source :target])]
+    (when (some? id)
+      (letfn [(items-with-id [idx itm]
+                (when (some #(= (name id) (name %)) (map #(get itm %) which))
+                  (assoc itm :index idx)))]
+        (->> connections
+             (keep-indexed items-with-id)
+             (into []))))))
+
+(defn reagent-flow
+  "This is the main component of `reagent-flow`. It differs from
+  `ReactFlow` in a few ways.
+
+   - You pass regular Clojure data-structures to all paramaters, so
+     vectors instead of arrays, maps instead of objects and so on.
+   - Viewport events are baked in, so you use the events
+     `on-viewport-(change|start|end)` to listen for changes in the
+     Viewport.
+   - reagent-flow-provider is also used, so if you need to have
+     multiple flows on the same page, just be sure to give each of them a
+     unique `id`.
+
+   Note!
+   Node-types & edge-types are called directly from within ReactFlow,
+   so the parameters returned are in their JavaScript-form. A nice
+   pattern, is to only rely on the `id` from the parameters and do
+   lookups in your state manually.
+   Ex.
+   (defn- custom-node [{:keys [id]}]
+     (let [node (flow/get-node-by-id @nodes id)
+           data (:data node)]
+       [:p (:label data)])"
+  [params & children]
+  (let [on-viewport-change (:on-viewport-change params)
+        on-viewport-start  (:on-viewport-start params)
+        on-viewport-end    (:on-viewport-end params)
+        params             (dissoc params :on-viewport-change :on-viewport-start :on-viewport-end)]
+    [reagent-flow-provider
+     [:f> reagent-flow*
+      (into [on-viewport-change
+             on-viewport-start
+             on-viewport-end
+             params] children)]]))
+#+end_src
+
+
+** Tests                                                              :noexport:
+
+#+begin_src clojurescript :tangle babel/test/reagent_flow/core_test.cljs :noweb yes
+(ns reagent-flow.core-test
+  (:require
+   [cljs.test :refer-macros [deftest testing is]]
+   [reagent-flow.core :refer [get-node-by-id get-connections-by-node-id]]))
+
+(deftest getting-node-by-id
+  (let [nodes [{:id :node1} {:id :node2}]] 
+    (testing "Retrieving a node by it's id, should return the node enriched with it's index"
+      (is (= {:id :node2 :index 1} (get-node-by-id nodes :node2))))
+    (testing "Should return `nil` when node is missing"
+      (is (nil? (get-node-by-id nodes :missing))))))
+
+(deftest getting-connections-by-node-id
+  (let [connections [{:id :conn1 :source :node1 :target :node2}
+                     {:id :conn2 :source :node1 :target :node3}
+                     {:id :conn3 :source :node3 :target :node2}]]
+    (testing "Getting source connections by node id"
+      (is (= [{:id :conn1 :source :node1 :target :node2 :index 0}
+              {:id :conn2 :source :node1 :target :node3 :index 1}]
+             (get-connections-by-node-id connections :node1 :source))))
+    (testing "Getting target connections by node id"
+      (is (= [{:id :conn1 :source :node1 :target :node2 :index 0}
+              {:id :conn3 :source :node3 :target :node2 :index 2}]
+             (get-connections-by-node-id connections :node2 :target))))
+    ;; Note that the third/forth parameter is not needed when retrieving both
+    (testing "Getting both source and target connections by node id"
+      (is (= [{:id :conn2 :source :node1 :target :node3 :index 1}
+              {:id :conn3 :source :node3 :target :node2 :index 2}]
+             (get-connections-by-node-id connections :node3))))))
+#+end_src
+
+
+** Manifests                                                          :noexport:
+
+**** Deps.edn
+#+begin_src clojure :tangle babel/deps.edn
+{:deps  {org.clojure/clojurescript {:mvn/version "1.11.51"}
+         dev.weavejester/medley    {:mvn/version "1.5.0"}
+         reagent/reagent           {:mvn/version "1.1.1"}}
+ :paths ["src" "out"]
+ :aliases
+ {:shadow-cljs {:extra-deps {thheller/shadow-cljs {:mvn/version "2.20.19"}}
+                :main-opts  ["-m" "shadow.cljs.devtools.cli"]}
+  :build       {:main-opts ["-m" "cljs.main" "-co" "build.edn" "-c"]}
+  :test        {:extra-deps  {olical/cljs-test-runner {:mvn/version "3.8.0"}}
+                :extra-paths ["test" "cljs-test-runner-out/gen"]
+                :main-opts   ["-m" "cljs-test-runner.main" "-d" "test"]}
+  :jar         {:extra-deps {uberdeps/uberdeps {:mvn/version "1.1.4"}}
+                :main-opts  ["-m" "uberdeps.uberjar" "--target" "reagent-flow.jar"]}}}
+#+end_src
+
+**** Shadow-cljs.edn
+#+begin_src clojure :tangle babel/shadow-cljs.edn
+{:deps  true
+ :nrepl {:port 9000}
+ :builds
+ {:reagent-flow
+  {:modules
+   {:reagent-flow {:entries [reagent-flow.core]}}
+   :target     :bootstrap
+   :output-dir "out"}}}
+#+end_src
+
+**** Build.edn
+#+begin_src clojure :tangle babel/build.edn :noweb yes
+{:main            reagent-flow.core
+ :output-to       "out/reagent_flow.js"
+ :output-dir      "out"
+ :infer-externs   true
+ :npm-deps        false
+ :optimizations   :advanced
+ :pseudo-names    true
+ :pretty-print    true
+ :foreign-libs    [{:file "create-react-class/create-react-class.js"
+                    :provides ["create-react-class"]
+                    :global-exports {create-react-class CreateReactClass}}
+                   {:file "react/cjs/react.development.js"
+                    :provides ["react"]
+                    :global-exports {react React}}
+                   {:file "react-dom/cjs/react-dom.development.js"
+                    :provides ["react-dom"]
+                    :global-exports {react-dom ReactDOM}
+                    :requires ["react" "create-react-class"]}
+                   {:file "reactflow/dist/umd/index.js"
+                    :provides ["reactflow"]
+                    :global-exports {reactflow ReactFlow}
+                    :requires ["react" "react-dom" "create-react-class"]}]}
+#+end_src
+
+**** Package.json
+#+begin_src javascript :tangle babel/package.json :noweb yes
+{
+    "name": "reagent-flow",
+    "version": "<<version>>",
+    "private": true,
+    "license": "MIT",
+    "dependencies": {
+	"create-react-class": "^15.7.0",
+	"react":              "^17.0.2-0",
+	"react-dom":          "^17.0.2-0",
+	"reactflow":          "^<<version>>"
+    },
+    "devDependencies": {
+        "shadow-cljs": "^2.16.7"
+    }
+}
+#+end_src
+
+**** Pom.xml
+#+begin_src xml :tangle babel/pom.xml :noweb yes
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>net.clojars.simtech</groupId>
+  <artifactId>reagent-flow</artifactId>
+  <version><<version>></version>
+  <name>reagent-flow</name>
+  <description>A ClojureScript library that wraps ReactFlow</description>
+  <url>https://github.com/dnv-opensource/reagent-flow</url>
+
+  <licenses>
+    <license>
+      <name>MIT</name>
+      <url>https://mit-license.org/</url>
+    </license>
+  </licenses>
+
+  <developers>
+    <developer>
+      <name>Henrik Kjerringvåg</name>
+    </developer>
+  </developers>
+
+  <scm>
+    <url>https://github.com/dnv-opensource/reagent-flow</url>
+    <connection>scm:git:git://github.com/dnv-opensource/reagent-flow.git</connection>
+    <developerConnection>scm:git:ssh://git@github.com/dnv-opensource/reagent-flow.git</developerConnection>
+    <tag>HEAD</tag>
+  </scm>
+
+</project>
+#+end_src
+
+
+* Contributing
+:properties:
+:header-args: :mkdirp yes :results silent
+:end:
+
+The repository for this library can be found on [[https://github.com/dnv-opensource/reagent-flow/][github]].
+
+As mentioned, reagent-flow is just a wrapper, so there's not much
+logic here. If you discover any issues, those are likely to stem from
+[[https://github.com/wbkd/react-flow][ReactFlow]] and should be reported there. If you are confident that
+you've discovered an issue with this wrapper or have some feedback,
+feel free to open an [[https://github.com/dnv-opensource/reagent-flow/issues/new/choose][issue]].
+
+The wrapper is written in a literate style using [[https://orgmode.org/][org-mode]]; so
+to contribute code, the easiest path is to use Emacs for the time being.
+All code, tests and documentation is in ~index.org~, from there it's
+about tangling and weaving the document:
+
+- ~C-c C-v t~ will tangle the source-code into files on disk (~babel/~).
+- ~M-x org-publish-project~ & ~reagent-flow~ will weave the documentation
+  onto the filesystem (~docs/~).
+
+After having done this, you should be able to build & run tests locally:
+
+
+** Building
+#+begin_src shell :dir babel
+npm i
+clojure -M:build
+#+end_src
+
+** Running tests
+#+begin_src shell :dir babel
+clojure -M:test
+#+end_src
+
+** Running examples locally
+
+First publish the documentation
+#+begin_src emacs-lisp
+(org-publish-project "reagent-flow")
+#+end_src
+
+then run the shadow watcher in the ~babel/examples~ directory
+#+begin_src shell :dir babel/examples
+npm i
+clj -M:shadow-cljs watch examples
+#+end_src
+
+and follow the instructions that appear.
+
+
+** Publishing
+
+Whenever a pull-request is merged into ~main~, a github-action takes
+over. The action will build & run tests. If the tests pass ✓️, the
+library will be packed into a jar, shipped to [[https://clojars.org][Clojars]] and the
+documentation; published.
+
+
+* Auxiliary                                                          :noexport:
+
+This is specific to org-mode & should be the last piece of the
+document. We load Setup.org & some of the source-blocks therein.
+# Local Variables:
+# org-confirm-babel-evaluate: nil
+# eval: (org-babel-lob-ingest "Setup.org")
+# eval: (org-sbe helpers)
+# eval: (org-sbe publishing)
+# End:

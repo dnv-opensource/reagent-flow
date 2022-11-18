@@ -1,0 +1,26 @@
+name: Continous Deployment
+
+on:
+  push:
+    tags:
+      - '*'
+
+jobs:
+
+  build:
+
+    uses: dnv-opensource/reagent-flow/.github/workflows/CI.yml
+
+  release:
+
+    runs-on: ubuntu-latest
+
+    needs: build
+
+    steps:
+
+      - name: Publish to Clojars
+        uses: jlesquembre/clojars-publish-action@0.3
+          env:
+            CLOJARS_USERNAME: ${{ secrets.CLOJARS_USERNAME }}
+            CLOJARS_PASSWORD: ${{ secrets.CLOJARS_PASSWORD }}

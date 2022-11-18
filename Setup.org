@@ -1,0 +1,721 @@
+:properties:
+:header-args: :mkdirp yes :results silent
+:end:
+#+author:  Henrik Kjerringvåg
+#+options: d:nil toc:nil
+#+language: en
+#+tags: noexport(n)
+#+exclude_tags: noexport
+#+html_doctype: html5
+#+html_head_extra: <meta http-equiv="Permissions-Policy" content="interest-cohort=()">
+#+html_head_extra: <link rel="stylesheet" href="css/docs.css">
+#+html_head_extra: <script defer src="js/examples.js"></script>
+#+html_head_extra: <script defer src="js/docs.js"></script>
+
+
+* Setup
+
+This file only serves auxiliary purposes, like how the documentation
+should be published, what license to use, etc.
+
+* Helpers
+
+#+name: helpers
+#+begin_src emacs-lisp
+(defun react->reagent (name)
+ (s-dashed-words
+  (if (not (equal name "ReactFlow"))
+      (s-replace "React" "Reagent" name)
+    name)))
+#+end_src
+
+* License
+
+#+name: preamble
+#+begin_src clojurescript :noweb yes
+;;
+;; This program is written in a literate style. That means; this
+;; source-file is generated and you should not make direct edits. You
+;; should instead make your contributions in `index.org` and tangle it.
+;; Please have a look at https://orgmode.org/ for more information.
+;;
+;; --------------------------------------------------------------------
+;;
+;;   <<license>>
+;;
+#+end_src
+
+#+name: year
+#+begin_src emacs-lisp
+(format-time-string "%Y")
+#+end_src
+
+#+name: license
+#+begin_src text :tangle LICENSE :noweb yes
+MIT License
+
+Copyright (C) <<year()>> DNV GL
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+#+end_src
+
+* Publishing
+
+#+name: publishing
+#+begin_src emacs-lisp
+(unless (boundp 'org-publish-project-alist)
+  (setq org-publish-project-alist nil))
+
+(add-to-list 'org-publish-project-alist
+	     `("reagent-flow-static"
+	       :base-directory ,default-directory
+	       :base-extension "png\\|jpg\\|gif\\|svg"
+	       :publishing-directory ,(expand-file-name "docs" default-directory)
+	       :publishing-function org-publish-attachment))
+
+(add-to-list 'org-publish-project-alist
+	     `("reagent-flow-html-docs"
+	       :base-directory ,default-directory
+	       :publishing-directory ,(expand-file-name "docs" default-directory)
+	       :publishing-function org-html-publish-to-html
+	       :section-numbers nil
+	       :html-head-include-default-style nil
+	       :html-head-include-scripts nil
+	       :html-postamble nil
+	       :htmlize-output-type "css"
+	       :htmlized-source t
+	       :exclude "README\\.org\\|Setup\\.org"
+	       :with-toc t))
+
+(add-to-list 'org-publish-project-alist
+	     `("reagent-flow"
+	       :components ("reagent-flow-static" "reagent-flow-html-docs")))
+#+end_src
+
+
+** Styles
+
+*** Theme
+
+#+begin_src css :tangle docs/css/docs.css
+:root {
+    --identity-hs: 218, 100%;
+    --identity-hsl: var(--identity-hs), 28%;
+    --inactive-hsl: 0, 0%, 60%;
+
+    --primary-hsl: var(--identity-hs), 40%;
+
+    --face-hs: 0, 0%;
+    --face-hsl: var(--face-hs), 20%;
+
+    --background-hs: 0, 0%;
+    --background-hsl: var(--background-hs), 100%;
+
+    --function-name-hs: 20, 50%;
+    --function-name-hsl: var(--function-name-hs), 40%;
+
+    --variable-name-hs: 40, 50%;
+    --variable-name-hsl: var(--variable-name-hs), 40%;
+    
+    --type-hs: 100, 30%;
+    --type-hsl: var(--type-hs), 40%;
+    
+    --string-hs: 0, 30%;
+    --string-hsl: var(--string-hs), 50%;
+    
+    --constant-hs: 40, 60%;
+    --constant-hsl: var(--constant-hs), 50%;
+    
+    --keyword-hs: 250, 40%;
+    --keyword-hsl: var(--keyword-hs), 50%;
+
+    --todo-hs: 0, 80%;
+    --todo-hsl: var(--todo-hs), 80%;
+
+    --dots-hex: #ddd;
+
+    --easeInOutCubic: cubic-bezier(0.645, 0.045, 0.355, 1.000);
+    --radius: 0.5em;
+    --shadow: 0 .1em .2em hsla(var(--identity-hsl), 0.3);
+}
+
+@media (prefers-color-scheme: dark) {
+    :root {
+        --background-hsl: var(--background-hs), 10%;
+        --face-hsl: var(--face-hs), 70%;
+	--inactive-hsl: 0, 0%, 85%;
+        --dots-hex: #333;
+    }
+}
+#+end_src
+
+*** Base
+
+#+begin_src css :tangle docs/css/docs.css
+,*,
+::before,
+::after {
+    box-sizing: border-box;
+}
+
+html,
+body {
+    background: hsl(var(--background-hsl));
+    color: hsl(var(--face-hsl));
+    margin: 0;
+}
+
+,*:not(input) {
+  user-select: none;
+}
+
+#content {
+    margin: 0 auto;
+    max-width: 110em;
+    padding: 3vw;
+}
+#+end_src
+
+*** Typography
+
+#+begin_src css :tangle docs/css/docs.css
+:root {
+    --sans-serif: -apple-system, BlinkMacSystemFont, Segoe UI,
+      Roboto, Oxygen, Ubuntu, Cantarell, Fira Sans, Droid Sans,
+      Helvetica Neue, sans-serif;
+    --monospace: JetBrains Mono, Roboto Mono, Courier, Courier New;
+}
+
+html {
+    font-size: 62.5%;
+}
+body {
+    font-size: 1.5em;
+    font-family: var(--sans-serif);
+}
+
+.title {
+    font-size: calc(3em + 4vw);
+    line-height: .9em;
+    margin: 29vh 0;
+}
+.title .subtitle {
+    font-size: 5vw;
+    font-weight: 100;
+}
+h2 {
+    margin-top: 20vh;
+    font-size: calc(2em + 2vw);
+    font-weight: 100;
+}
+h3 {
+    font-size: calc(1.5em + 1.25vw);
+    font-weight: 100;
+}
+
+p {
+    font-size: 1.3em;
+    line-height: 1.5em;
+    max-width: 50em;
+}
+
+p > code {
+    background: var(--dots-hex);
+    border-radius: .2em;
+    padding: .1em .5em;
+}
+
+pre,
+code {
+    font-family: var(--monospace);
+}
+#+end_src
+
+*** ReactFlow
+
+#+begin_src css :tangle docs/css/docs.css
+.react-flow__container {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  top: 0;
+  left: 0;
+}
+.react-flow__pane {
+  z-index: 1;
+  cursor: -webkit-grab;
+  cursor: grab;
+}
+.react-flow__pane.selection {
+    cursor: pointer;
+  }
+.react-flow__pane.dragging {
+    cursor: -webkit-grabbing;
+    cursor: grabbing;
+  }
+.react-flow__viewport {
+  transform-origin: 0 0;
+  z-index: 2;
+  pointer-events: none;
+}
+.react-flow__renderer {
+  z-index: 4;
+}
+.react-flow__selection {
+  z-index: 6;
+}
+.react-flow__nodesselection-rect:focus,
+.react-flow__nodesselection-rect:focus-visible {
+  outline: none;
+}
+.react-flow .react-flow__edges {
+  pointer-events: none;
+  overflow: visible;
+}
+.react-flow__edge-path,
+.react-flow__connection-path {
+  stroke: #b1b1b7;
+  stroke-width: 1;
+  fill: none;
+}
+.react-flow__edge {
+  pointer-events: visibleStroke;
+  cursor: pointer;
+}
+.react-flow__edge.animated path {
+    stroke-dasharray: 5;
+    -webkit-animation: dashdraw 0.5s linear infinite;
+            animation: dashdraw 0.5s linear infinite;
+  }
+.react-flow__edge.animated path.react-flow__edge-interaction {
+    stroke-dasharray: none;
+    -webkit-animation: none;
+            animation: none;
+  }
+.react-flow__edge.inactive {
+    pointer-events: none;
+  }
+.react-flow__edge.selected,
+  .react-flow__edge:focus,
+  .react-flow__edge:focus-visible {
+    outline: none;
+  }
+.react-flow__edge.selected .react-flow__edge-path,
+  .react-flow__edge:focus .react-flow__edge-path,
+  .react-flow__edge:focus-visible .react-flow__edge-path {
+    stroke: #555;
+  }
+.react-flow__edge-textwrapper {
+    pointer-events: all;
+  }
+.react-flow__edge-textbg {
+    fill: white;
+  }
+.react-flow__edge .react-flow__edge-text {
+    pointer-events: none;
+    -webkit-user-select: none;
+       -moz-user-select: none;
+            user-select: none;
+  }
+.react-flow__connection {
+  pointer-events: none;
+}
+.react-flow__connection.animated {
+    stroke-dasharray: 5;
+    -webkit-animation: dashdraw 0.5s linear infinite;
+            animation: dashdraw 0.5s linear infinite;
+  }
+.react-flow__connectionline {
+  z-index: 1001;
+}
+.react-flow__nodes {
+  pointer-events: none;
+  transform-origin: 0 0;
+}
+.react-flow__node {
+  position: absolute;
+  -webkit-user-select: none;
+     -moz-user-select: none;
+          user-select: none;
+  pointer-events: all;
+  transform-origin: 0 0;
+  box-sizing: border-box;
+  cursor: -webkit-grab;
+  cursor: grab;
+}
+.react-flow__node.dragging {
+    cursor: -webkit-grabbing;
+    cursor: grabbing;
+  }
+.react-flow__nodesselection {
+  z-index: 3;
+  transform-origin: left top;
+  pointer-events: none;
+}
+.react-flow__nodesselection-rect {
+    position: absolute;
+    pointer-events: all;
+    cursor: -webkit-grab;
+    cursor: grab;
+  }
+.react-flow__handle {
+  position: absolute;
+  pointer-events: none;
+  min-width: 5px;
+  min-height: 5px;
+  width: 6px;
+  height: 6px;
+  background: #1a192b;
+  border: 1px solid white;
+  border-radius: 100%;
+}
+.react-flow__handle.connectable {
+    pointer-events: all;
+    cursor: crosshair;
+  }
+.react-flow__handle-bottom {
+    top: auto;
+    left: 50%;
+    bottom: -4px;
+    transform: translate(-50%, 0);
+  }
+.react-flow__handle-top {
+    left: 50%;
+    top: -4px;
+    transform: translate(-50%, 0);
+  }
+.react-flow__handle-left {
+    top: 50%;
+    left: -4px;
+    transform: translate(0, -50%);
+  }
+.react-flow__handle-right {
+    right: -4px;
+    top: 50%;
+    transform: translate(0, -50%);
+  }
+.react-flow__edgeupdater {
+  cursor: move;
+  pointer-events: all;
+}
+.react-flow__panel {
+  position: absolute;
+  z-index: 5;
+  margin: 15px;
+}
+.react-flow__panel.top {
+    top: 0;
+  }
+.react-flow__panel.bottom {
+    bottom: 0;
+  }
+.react-flow__panel.left {
+    left: 0;
+  }
+.react-flow__panel.right {
+    right: 0;
+  }
+.react-flow__panel.center {
+    left: 50%;
+    transform: translateX(-50%);
+  }
+.react-flow__attribution {
+  font-size: 10px;
+  background: rgba(255, 255, 255, 0.5);
+  padding: 2px 3px;
+  margin: 0;
+}
+.react-flow__attribution a {
+    text-decoration: none;
+    color: #999;
+  }
+@-webkit-keyframes dashdraw {
+  from {
+    stroke-dashoffset: 10;
+  }
+}
+@keyframes dashdraw {
+  from {
+    stroke-dashoffset: 10;
+  }
+}
+.react-flow__edgelabel-renderer {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+.react-flow__edge.updating .react-flow__edge-path {
+      stroke: #777;
+    }
+.react-flow__edge-text {
+    font-size: 10px;
+  }
+.react-flow__node.selectable:focus,
+  .react-flow__node.selectable:focus-visible {
+    outline: none;
+  }
+.react-flow__node-default,
+.react-flow__node-input,
+.react-flow__node-output,
+.react-flow__node-group {
+  padding: 10px;
+  border-radius: 3px;
+  width: 150px;
+  font-size: 12px;
+  color: #222;
+  text-align: center;
+  border-width: 1px;
+  border-style: solid;
+  border-color: #1a192b;
+  background-color: white;
+}
+.react-flow__node-default.selectable:hover, .react-flow__node-input.selectable:hover, .react-flow__node-output.selectable:hover, .react-flow__node-group.selectable:hover {
+      box-shadow: 0 1px 4px 1px rgba(0, 0, 0, 0.08);
+    }
+.react-flow__node-default.selectable.selected,
+    .react-flow__node-default.selectable:focus,
+    .react-flow__node-default.selectable:focus-visible,
+    .react-flow__node-input.selectable.selected,
+    .react-flow__node-input.selectable:focus,
+    .react-flow__node-input.selectable:focus-visible,
+    .react-flow__node-output.selectable.selected,
+    .react-flow__node-output.selectable:focus,
+    .react-flow__node-output.selectable:focus-visible,
+    .react-flow__node-group.selectable.selected,
+    .react-flow__node-group.selectable:focus,
+    .react-flow__node-group.selectable:focus-visible {
+      box-shadow: 0 0 0 0.5px #1a192b;
+    }
+.react-flow__node-group {
+  background-color: rgba(240, 240, 240, 0.25);
+}
+.react-flow__nodesselection-rect,
+.react-flow__selection {
+  background: rgba(0, 89, 220, 0.08);
+  border: 1px dotted rgba(0, 89, 220, 0.8);
+}
+.react-flow__nodesselection-rect:focus,
+  .react-flow__nodesselection-rect:focus-visible,
+  .react-flow__selection:focus,
+  .react-flow__selection:focus-visible {
+    outline: none;
+  }
+#+end_src
+
+*** Overrides
+
+#+begin_src css  :tangle docs/css/docs.css
+.react-flow__background {
+    background-color: hsl(var(--background-hs), 98%);
+}
+.react-flow .react-flow__background pattern {
+    stroke: var(--dots-hex);
+}
+.react-flow .react-flow__handle {
+    --size: .5em;
+    background: hsl(var(--background-hs), 60%);
+    border-width: .1em;
+    box-shadow: 0 0.1em 0.2em hsla(0, 30%, 10%, 0.2);
+    height: var(--size);
+    width: var(--size);
+}
+.react-flow .react-flow__node-default.selectable,
+.react-flow .react-flow__node div:first-child {
+    border: none !important;
+    box-shadow: 0 0.1em 0.2em hsla(0, 30%, 10%, 0.2);
+}
+#+end_src
+
+*** Syntax highlighting
+
+#+begin_src css :tangle docs/css/docs.css
+.org-function-name {
+    color: hsl(var(--function-name-hsl));
+}
+
+.org-variable-name {
+    color: hsl(var(--variable-name-hsl));
+}
+
+.org-type {
+    color: hsl(var(--type-hsl));
+}
+
+.org-comment,
+.org-comment-delimiter,
+.org-string {
+    color: hsl(var(--string-hsl));
+}
+
+.org-constant {
+    color: hsl(var(--constant-hsl));
+}
+
+.org-clojure-keyword {
+    color: hsl(var(--keyword-hsl));
+}
+#+end_src
+
+#+begin_src css :tangle docs/css/docs.css
+a {
+    color: hsl(var(--primary-hsl));
+}
+
+.outline-text-2 {
+    max-width: 60em;
+}
+
+.example {
+    display: grid;
+    grid-template-columns: [documentation] 1fr [example] 1fr;
+    grid-auto-flow: row;
+    gap: 2.5vw;
+}
+.outline-3:nth-child(odd) .example {
+    grid-template-columns: [example] 1fr [documentation] 1fr;
+}
+.example > :not(.output) {
+    grid-column-start: documentation;
+}
+.output {
+    background-color: hsl(var(--background-hsl));
+    grid-column-start: example;
+    grid-row: 1/10;
+    min-height: 10vh;
+    max-height: min(800px, 90vh);
+    width: 100%;
+    position: sticky;
+    top: 5vh;
+    overflow: hidden;
+}
+
+@media only screen and (max-width: 1024px) {
+    .example {
+        display: block;
+    }
+}
+
+.org-src-container {
+    overflow: auto;
+}
+.src {
+    color: hsl(var(--face-hs), 70%);
+    font-size: 1.3rem;
+    line-height: 1.5;
+}
+
+/* The version-number */
+.src-text {
+    background: hsl(var(--identity-hsl));
+    border-radius: .2em;
+    color: white;
+    display: inline-block;
+    font-size: 1.5em;
+    padding: .2em .5em;
+}
+
+.todo {
+    color: hsl(var(--todo-hsl));
+    font-size: 1.35rem;
+    font-weight: 100;
+}
+#+end_src
+
+*** Example specific
+
+#+begin_src css  :tangle docs/css/docs.css
+[data-id="explanation"] {
+    background: transparent;
+    border: none;
+    color: gray;
+    font-size: 12px;
+}
+[data-id="explanation"] * {
+    display: none;
+}
+
+.react-flow__node-color-node {
+    background: transparent;
+    border: none;
+}
+.color-picker {
+    --radius: 0.5em;
+    --size: 2.5em;
+    -webkit-appearance: none;
+    border-radius: var(--radius);
+    border: none;
+    height: var(--size);
+    margin: 0;
+    margin-top: .45em;
+    outline: none;
+    padding: 0;
+    width: var(--size);
+}
+.color-picker::-moz-color-swatch, 
+.color-picker::-webkit-color-swatch,
+.color-picker::-webkit-color-swatch-wrapper {
+    border: none;
+    border-radius: var(--radius);
+    padding: 0;
+}
+
+.node-palette {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    width: 100%;
+    margin: 0;
+    padding: 1em;
+    top: 1em;
+    left: 1em;
+}
+.node-palette .node {
+    background: white;
+    border: 1px solid black;
+    border-radius: 0.5em;
+    cursor: grab;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 1em;
+}
+
+#+end_src
+
+** Actions
+
+#+begin_src javascript :tangle docs/js/docs.js
+const main = (w, d) => {
+    const examples = [].slice.call(d.querySelectorAll('[data-src]'));
+    examples.map(example => {
+        const observer = new IntersectionObserver(observed => {
+            const exampleName = example.getAttribute('data-src');
+            if (observed[0].isIntersecting) {
+                w[`${exampleName}`].core.init(example);
+            } else {
+                w[`${exampleName}`].core.unload(example);
+            }
+        });
+        observer.observe(example);
+    });
+}
+
+main(window, document);
+#+end_src

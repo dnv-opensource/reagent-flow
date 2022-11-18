@@ -1,0 +1,37 @@
+name: Continous Integration
+
+on:
+  pull_request:
+    types:
+      - closed
+    branches:
+      - 'main'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+
+      - uses: actions/checkout@v3
+
+      - uses: purcell/setup-emacs@master
+            with:
+              version: 28.2
+
+      - uses: DeLaGuardo/setup-clojure@9.5
+
+      - name: Tangle
+         run: |
+           emacs -Q -e "(org-babel-tangle-file \"./index.org\")"
+
+      - name: Build
+        run: |
+          npm i
+          clojure -M:build
+
+      - name: Run tests
+        run: 'clojure -M:test'
+
+      - name: Package jar
+        run: 'clojure -M:jar'
