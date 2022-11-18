@@ -7,33 +7,34 @@ on:
 jobs:
   docs:
     runs-on: ubuntu-latest
+    steps:
 
-  steps:
-    - uses: actions/checkout@v3
-
-    - uses: purcell/setup-emacs@master
-          with:
-            version: 28.2
-
-    - name: Extract Documentation
-      run: |
-        emacs -Q -e "(require 'org)"                          \
-                 -e "(require 'ob-lob)"                       \
-                 -e "(require 'ob-tangle)"                    \
-                 -e "(load-file \"./index.org\")"             \
-                 -e "(org-babel-tangle-file \"./Setup.org\")" \
-                 -e "(setq org-confirm-babel-evaluate nil)"   \
-                 -e "(org-publish-project \"reagent-flow\")"
-
-    - name: Remove everything but the documentation
-      run: |
-        rm -fr *.org LICENSE babel
-        mv docs/* /
-        rm -fr docs
-
-    - name: Publish to Github pages
-      run: |
-        git config --global user.name documentation-action
-        git config --global user.email reagent-flow@github.com
-        git add -A && git commit -m "Documentation"
-        git push origin HEAD:gh-pages --force
+      - name: Checkout
+        uses: actions/checkout@v3
+  
+      - name: Setup Emacs
+        uses: purcell/setup-emacs@master
+        with:
+          version: 28.2
+  
+      - name: Extract Documentation
+        run: |
+          emacs -Q -e "(require 'org)"                        \
+                   -e "(require 'ob-lob)"                     \
+                   -e "(require 'ob-tangle)"                  \
+                   -e "(setq org-confirm-babel-evaluate nil)" \
+                   -e "(load-file \"./index.org\")"           \
+                   -e "(org-publish-project \"reagent-flow\")"
+  
+      - name: Remove everything but the documentation
+        run: |
+          rm -fr *.org LICENSE babel
+          mv docs/* /
+          rm -fr docs
+  
+      - name: Publish to Github pages
+        run: |
+          git config --global user.name documentation-action
+          git config --global user.email reagent-flow@github.com
+          git add -A && git commit -m "Documentation"
+          git push origin HEAD:gh-pages --force
