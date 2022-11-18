@@ -106,6 +106,9 @@ SOFTWARE.
 (add-to-list 'org-publish-project-alist
 	     `("reagent-flow"
 	       :components ("reagent-flow-static" "reagent-flow-html-docs")))
+
+(add-hook 'org-publish-after-publishing-hook
+          (lambda (orig out) (org-babel-tangle-file orig)))
 #+end_src
 
 

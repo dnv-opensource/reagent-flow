@@ -360,9 +360,9 @@ reagent state-handling.
          net.clojars.simtech/reagent-flow {:local/root "../"}}
  :paths ["src"]
  :aliases
- {:shadow-cljs {:extra-deps {thheller/shadow-cljs {:mvn/version "2.20.20"}
-                             binaryage/devtools   {:mvn/version "1.0.6"}}
-                :main-opts  ["-m" "shadow.cljs.devtools.cli"]}}}
+ {:watch {:extra-deps {thheller/shadow-cljs {:mvn/version "2.20.20"}
+                       binaryage/devtools   {:mvn/version "1.0.6"}}
+          :main-opts  ["-m" "shadow.cljs.devtools.cli" "watch" "examples"]}}}
 #+end_src
 
 *** Shadow-cljs.edn
@@ -873,9 +873,8 @@ client-code.
          reagent/reagent           {:mvn/version "1.1.1"}}
  :paths ["src" "out"]
  :aliases
- {:shadow-cljs {:extra-deps {thheller/shadow-cljs {:mvn/version "2.20.19"}}
-                :main-opts  ["-m" "shadow.cljs.devtools.cli"]}
-  :build       {:main-opts ["-m" "cljs.main" "-co" "build.edn" "-c"]}
+ {:build       {:extra-deps {thheller/shadow-cljs {:mvn/version "2.20.19"}}
+                :main-opts  ["-m" "shadow.cljs.devtools.cli" "release" "reagent-flow"]}
   :test        {:extra-deps  {olical/cljs-test-runner {:mvn/version "3.8.0"}}
                 :extra-paths ["test" "cljs-test-runner-out/gen"]
                 :main-opts   ["-m" "cljs-test-runner.main" "-d" "test"]}
@@ -893,32 +892,6 @@ client-code.
    {:reagent-flow {:entries [reagent-flow.core]}}
    :target     :bootstrap
    :output-dir "out"}}}
-#+end_src
-
-**** Build.edn
-#+begin_src clojure :tangle babel/build.edn :noweb yes
-{:main            reagent-flow.core
- :output-to       "out/reagent_flow.js"
- :output-dir      "out"
- :infer-externs   true
- :npm-deps        false
- :optimizations   :advanced
- :pseudo-names    true
- :pretty-print    true
- :foreign-libs    [{:file "create-react-class/create-react-class.js"
-                    :provides ["create-react-class"]
-                    :global-exports {create-react-class CreateReactClass}}
-                   {:file "react/cjs/react.development.js"
-                    :provides ["react"]
-                    :global-exports {react React}}
-                   {:file "react-dom/cjs/react-dom.development.js"
-                    :provides ["react-dom"]
-                    :global-exports {react-dom ReactDOM}
-                    :requires ["react" "create-react-class"]}
-                   {:file "reactflow/dist/umd/index.js"
-                    :provides ["reactflow"]
-                    :global-exports {reactflow ReactFlow}
-                    :requires ["react" "react-dom" "create-react-class"]}]}
 #+end_src
 
 **** Package.json
@@ -1025,7 +998,7 @@ First publish the documentation
 then run the shadow watcher in the ~babel/examples~ directory
 #+begin_src shell :dir babel/examples
 npm i
-clj -M:shadow-cljs watch examples
+clj -M:watch
 #+end_src
 
 and follow the instructions that appear.
@@ -1035,8 +1008,9 @@ and follow the instructions that appear.
 
 Whenever a pull-request is merged into ~main~, a github-action takes
 over. The action will build & run tests. If the tests pass ✓️, the
-library will be packed into a jar, shipped to [[https://clojars.org][Clojars]] and the
-documentation; published.
+library will be packed into a jar. To actually publish to [[https://clojars.org][Clojars]] and
+update github pages with the latest documentation, you'll have to
+create a tag.
 
 
 * Auxiliary                                                          :noexport:

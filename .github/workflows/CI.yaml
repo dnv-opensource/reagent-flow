@@ -10,28 +10,31 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-
     steps:
+    - name: Checkout
+      uses: actions/checkout@v3
 
-      - uses: actions/checkout@v3
+    - name: Setup Emacs
+      uses: purcell/setup-emacs@master
+      with:
+        version: 28.2
 
-      - uses: purcell/setup-emacs@master
-            with:
-              version: 28.2
+    - name: Setup Clojure
+      uses: DeLaGuardo/setup-clojure@9.5
 
-      - uses: DeLaGuardo/setup-clojure@9.5
+    - name: Tangle
+      run: |
+        emacs -Q -e "(require 'org)"                        \
+                 -e "(require 'ob-tangle)"                  \
+                 -e "(org-babel-tangle-file \"./index.org\")"
+    
+    - name: Build
+      run: |
+        npm i
+        clojure -M:build
+    
+    - name: Run tests
+      run: 'clojure -M:test'
 
-      - name: Tangle
-         run: |
-           emacs -Q -e "(org-babel-tangle-file \"./index.org\")"
-
-      - name: Build
-        run: |
-          npm i
-          clojure -M:build
-
-      - name: Run tests
-        run: 'clojure -M:test'
-
-      - name: Package jar
-        run: 'clojure -M:jar'
+    - name: Package for Clojars
+      run: 'clojure -M:jar'

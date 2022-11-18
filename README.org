@@ -7,7 +7,10 @@
 
 [[https://img.shields.io/clojars/v/reagent-flow?include_prereleases&style=flat-square.svg]]
 
-Note that this wrapper is a work in progress & we need some more
-experience using it in order to confidently recommend it to others.
+*** Disclaimer
+
+Please be aware that this software is currently in the alpha stage of
+development. It may contain bugs and may not function as intended. Use
+at your own risk.
 
 [[https://dnv-opensource.github.io/reagent-flow][Usage, examples etc.]]
