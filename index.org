@@ -351,7 +351,7 @@ reagent state-handling.
 #+html: </div>
 
 
-** Examples manifests                                                 :noexport:
+** Manifests                                                           :noexport:
 
 *** Deps.edn
 #+begin_src clojure :tangle babel/examples/deps.edn

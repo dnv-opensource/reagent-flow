@@ -77,6 +77,9 @@ SOFTWARE.
 
 * Publishing
 
+Documentation can be published with ~M-x org-publish-project~.
+This will also tangle this setup-file which contain all the styles etc
+for the documentation-page.
 #+name: publishing
 #+begin_src emacs-lisp
 (unless (boundp 'org-publish-project-alist)
@@ -704,6 +707,8 @@ a {
 
 ** Actions
 
+We observe the code-blocks to see when it's in the viewport. When a
+code-block is visible, the code associated will be initialized.
 #+begin_src javascript :tangle docs/js/docs.js
 const main = (w, d) => {
     const examples = [].slice.call(d.querySelectorAll('[data-src]'));
