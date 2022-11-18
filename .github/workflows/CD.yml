@@ -1,0 +1,57 @@
+name: Continous Deployment
+
+on:
+  push:
+    tags:
+      - v*
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          github_token: ${{ secrets.WORKFLOW_TOKEN }}
+
+      - id: CD
+        uses: ./.github/actions/tangle
+
+      - name: Setup Node
+        uses: actions/setup-node@v3
+        with:
+            node-version: 18
+
+      - name: Setup Clojure
+        uses: DeLaGuardo/setup-clojure@10.1
+        with:
+          cli: 1.10.1.693
+          clj-kondo: 2022.05.31
+ 
+      - name: Build
+        shell: bash
+        run: |
+          cd babel
+          npm i
+          clojure -M:build
+
+      - name: Package jar
+        shell: bash
+        run: |
+          cd babel
+          clojure -M:jar
+
+      - name: Remove everything except the build
+        shell: bash
+        run: |
+          sudo rm -fr *.org LICENSE docs
+          sudo mv babel/* ./
+          sudo rm -fr babel
+      
+      - name: Deploy to Clojars
+        uses: jlesquembre/clojars-publish-action@0.3
+        env:
+          CLOJARS_USERNAME: ${{ secrets.CLOJARS_USERNAME }}
+          CLOJARS_PASSWORD: ${{ secrets.CLOJARS_PASSWORD }}

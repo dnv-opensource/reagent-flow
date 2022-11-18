@@ -1,0 +1,24 @@
+name: 'Tangle & weave'
+description: 'Extract source-code & doumentation from org-mode files'
+runs:
+  using: "composite"
+  steps:
+  - name: Checkout
+    uses: actions/checkout@v3
+  
+  - name: Setup Emacs
+    uses: purcell/setup-emacs@master
+    with:
+      version: snapshot
+  
+  - name: Tangle & weave
+    shell: bash
+    run: |
+      time emacs -Q --batch                                            \
+                 --eval '(load-file ".github/actions/tangle/init.el")' \
+                 --eval '(org-babel-lob-ingest "Setup.org")'           \
+                 --eval '(org-sbe helpers)'                            \
+                 --eval '(org-sbe publishing)'                         \
+                 --eval '(org-babel-tangle-file "index.org")'          \
+                 --eval '(org-babel-tangle-file "Setup.org")'          \
+                 --eval '(org-publish-project "reagent-flow")'

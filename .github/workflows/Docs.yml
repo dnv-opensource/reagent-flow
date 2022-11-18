@@ -1,0 +1,60 @@
+name: Documentation
+
+on:
+  push:
+    tags:
+      - v*
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          github_token: ${{ secrets.WORKFLOW_TOKEN }}
+
+      - id: Docs
+        uses: ./.github/actions/tangle
+        
+      - name: Setup Node
+        uses: actions/setup-node@v3
+        with:
+            node-version: 18
+
+      - name: Setup Clojure
+        uses: DeLaGuardo/setup-clojure@10.1
+        with:
+          cli: 1.10.1.693
+          clj-kondo: 2022.05.31
+      
+      - name: Build
+        shell: bash
+        run: |
+          cd babel
+          npm i
+          clojure -M:build
+
+      - name: Build examples
+        shell: bash
+        run: |
+          cd babel/examples
+          npm i
+          clojure -M:build
+      
+      - name: Remove everything but the documentation
+        shell: bash
+        run: |
+          sudo rm -fr *.org LICENSE babel .gitignore
+          sudo mv docs/* ./
+          sudo rm -fr docs
+      
+      - name: Publish to Github pages
+        shell: bash
+        run: |
+          git config --global user.name documentation-action
+          git config --global user.email reagent-flow@github.com
+          git add -A && git commit -m "Documentation"
+          git push origin HEAD:refs/heads/gh-pages --force

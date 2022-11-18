@@ -1,0 +1,37 @@
+name: Continuous Integration
+
+on: push
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - id: CI
+        uses: ./.github/actions/tangle
+  
+      - name: Setup Node
+        uses: actions/setup-node@v3
+        with:
+            node-version: 18
+
+      - name: Setup Clojure
+        uses: DeLaGuardo/setup-clojure@10.1
+        with:
+          cli: 1.10.1.693
+          clj-kondo: 2022.05.31
+      
+      - name: Build
+        shell: bash
+        run: |
+          cd babel
+          npm i
+          clojure -M:build
+      
+      - name: Run tests
+        shell: bash
+        run: |
+          cd babel
+          clojure -M:test

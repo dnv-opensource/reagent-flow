@@ -1,0 +1,7 @@
+.DS_Store
+.lsp
+.clj-kondo
+.dir-locals.el
+
+babel
+docs
