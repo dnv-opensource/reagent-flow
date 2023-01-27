@@ -34,11 +34,11 @@ jobs:
 
     - name: Tangle
       run: |
-        time emacs -Q --batch                                           \
-                   --eval '(load-file \".github/workflows/init.el\")'   \
-                   --eval '(org-babel-lob-ingest \"Setup.org\")'        \
-                   --eval '(org-sbe helpers)'                           \
-                   --eval '(org-babel-tangle-file \"index.org\")'
+        time emacs -Q --batch                                         \
+                   --eval '(load-file ".github/workflows/init.el")'   \
+                   --eval '(org-babel-lob-ingest "Setup.org")'        \
+                   --eval '(org-sbe helpers)'                         \
+                   --eval '(org-babel-tangle-file "index.org")'
     
     - name: Build
       run: |
