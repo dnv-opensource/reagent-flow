@@ -3,13 +3,12 @@
 ;; publishing the documentation.
 
 (prefer-coding-system 'utf-8)
-(add-to-list 'load-path (expand-file-name ".github/workflows/packages/s.el"))
-(add-to-list 'load-path (expand-file-name ".github/workflows/packages/dash.el"))
-
+(dolist (package '("s.el" "dash.el" "clojure-mode"))
+  (add-to-list 'load-path (expand-file-name package ".github/workflows/packages")))
 
 (require 's)
 (require 'dash)
-
+(require 'clojure-mode)
 (require 'org)
 (require 'ob-lob)
 (require 'ob-tangle)
