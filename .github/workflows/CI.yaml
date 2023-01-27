@@ -40,7 +40,7 @@ jobs:
 
     - name: Tangle
       run: |
-        time emacs -Q --batch
+        time emacs -Q --batch                                           \
                    --eval '(load-file \".github\workflows\init.el\")'   \
                    --eval '(org-babel-lob-ingest \"Setup.org\")'        \
                    --eval '(org-sbe helpers)'                           \
