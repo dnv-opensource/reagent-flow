@@ -1,0 +1,6 @@
+[submodule ".github/workflows/packages/s.el"]
+	path = .github/workflows/packages/s.el
+	url = https://github.com/magnars/s.el
+[submodule ".github/workflows/packages/dash.el"]
+	path = .github/workflows/packages/dash.el
+	url = https://github.com/magnars/dash.el

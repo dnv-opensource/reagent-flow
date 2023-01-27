@@ -13,6 +13,8 @@ jobs:
     steps:
     - name: Checkout
       uses: actions/checkout@v3
+      with:
+        submodules: 'recursive'
 
     - name: Setup Node
       uses: actions/setup-node@v3
@@ -22,7 +24,7 @@ jobs:
     - name: Setup Emacs
       uses: purcell/setup-emacs@master
       with:
-        version: 26.3
+        version: snapshot
 
     - name: Setup Clojure
       uses: DeLaGuardo/setup-clojure@10.1
@@ -35,10 +37,10 @@ jobs:
 
     - name: Tangle
       run: |
-        emacs -Q --batch                                   \
-              --eval '(load "org-compat")'                 \
-              --eval '(load "org-macs")'                   \
-              --eval '(org-babel-tangle-file "./index.org")'
+        emacs -Q --batch --load ".github\workflows\init.el"   \
+              --eval '(org-babel-lob-ingest \"Setup.org\")'   \
+              --eval '(org-sbe helpers)'                      \
+              --eval '(org-babel-tangle-file \"index.org\")'
     
     - name: Build
       run: |
