@@ -32,16 +32,10 @@ jobs:
         cli: 1.10.1.693
         clj-kondo: 2022.05.31
 
-    - name: Check emacs version
-      run: emacs --version
-
-    - name: Check emacs path
-      run: emacs -Q --batch --eval '(message "%s" default-directory)' 
-
     - name: Tangle
       run: |
         time emacs -Q --batch                                           \
-                   --eval '(load-file \".github\workflows\init.el\")'   \
+                   --eval '(load-file \".github/workflows/init.el\")'   \
                    --eval '(org-babel-lob-ingest \"Setup.org\")'        \
                    --eval '(org-sbe helpers)'                           \
                    --eval '(org-babel-tangle-file \"index.org\")'
