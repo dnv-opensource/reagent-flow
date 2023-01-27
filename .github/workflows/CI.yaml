@@ -22,7 +22,7 @@ jobs:
     - name: Setup Emacs
       uses: purcell/setup-emacs@master
       with:
-        version: 28.2
+        version: 26.3
 
     - name: Setup Clojure
       uses: DeLaGuardo/setup-clojure@10.1
@@ -34,7 +34,11 @@ jobs:
       run: emacs --version
 
     - name: Tangle
-      run: emacs --batch -e "(require 'org)" -e '(org-babel-tangle-file "./index.org")'
+      run: |
+        emacs -Q --batch                                   \
+              --eval '(load "org-compat")'                 \
+              --eval '(load "org-macs")'                   \
+              --eval '(org-babel-tangle-file "./index.org")'
     
     - name: Build
       run: |
