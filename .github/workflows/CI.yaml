@@ -37,9 +37,9 @@ jobs:
 
     - name: Tangle
       run: |
-        emacs -Q --batch --load ".github\workflows\init.el"   \
-              --eval '(org-babel-lob-ingest \"Setup.org\")'   \
-              --eval '(org-sbe helpers)'                      \
+        emacs -Q --batch --load "${{ env.GITHUB_ACTION_PATH }}/init.el"   \
+              --eval '(org-babel-lob-ingest \"Setup.org\")'               \
+              --eval '(org-sbe helpers)'                                  \
               --eval '(org-babel-tangle-file \"index.org\")'
     
     - name: Build
