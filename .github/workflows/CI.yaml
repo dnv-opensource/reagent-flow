@@ -34,7 +34,7 @@ jobs:
       run: emacs --version
 
     - name: Tangle
-      run: emacs -Q -e "(org-babel-tangle-file './index.org')"
+      run: emacs --batch -e "(org-babel-tangle-file './index.org')"
     
     - name: Build
       run: |
