@@ -7,3 +7,6 @@
 [submodule ".github/workflows/packages/clojure-mode"]
 	path = .github/workflows/packages/clojure-mode
 	url = https://github.com/clojure-emacs/clojure-mode/
+[submodule ".github/workflows/packages/cider"]
+	path = .github/workflows/packages/cider
+	url = https://github.com/clojure-emacs/cider
