@@ -14,13 +14,21 @@ jobs:
     - name: Checkout
       uses: actions/checkout@v3
 
+    - name: Setup Node
+      uses: actions/setup-node@v3
+      with:
+          node-version: 18
+
     - name: Setup Emacs
       uses: purcell/setup-emacs@master
       with:
         version: 28.2
 
     - name: Setup Clojure
-      uses: DeLaGuardo/setup-clojure@9.5
+      uses: DeLaGuardo/setup-clojure@10.1
+      with:
+        cli: 1.10.1.693
+        clj-kondo: 2022.05.31
 
     - name: Tangle
       run: |
