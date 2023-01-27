@@ -31,10 +31,7 @@ jobs:
         clj-kondo: 2022.05.31
 
     - name: Tangle
-      run: |
-        emacs -Q -e "(require 'org)"                        \
-                 -e "(require 'ob-tangle)"                  \
-                 -e "(org-babel-tangle-file \"./index.org\")"
+      run: emacs -Q -e "(require 'org)" -e "(require 'ob-tangle)" -e "(org-babel-tangle-file \"index.org\")"
     
     - name: Build
       run: |
