@@ -42,11 +42,16 @@ jobs:
     
     - name: Build
       run: |
+        cd babel
         npm i
         clojure -M:build
     
     - name: Run tests
-      run: 'clojure -M:test'
+      run: |
+        cd babel
+        clojure -M:test
 
     - name: Package for Clojars
-      run: 'clojure -M:jar'
+      run: |
+        cd babel
+        clojure -M:jar
