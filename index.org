@@ -397,7 +397,7 @@ reagent state-handling.
         "create-react-class": "^15.7.0",
         "react":              "^17.0.2-0",
         "react-dom":          "^17.0.2-0",
-        "reactflow":          "^<<version>>"
+        "reactflow":          "<<version>>"
     },
     "devDependencies": {
         "shadow-cljs": "^2.20.20"
@@ -414,7 +414,7 @@ We use the same version-scheme as ReactFlow. You're currently viewing
 version:
 #+name: version
 #+begin_src text
-11.1.2
+11.5.5
 #+end_src
 
 Here you'll find all the names of the classes, functions, hooks, and types of
@@ -454,7 +454,7 @@ this version of ReactFlow listed.
 - getSimpleBezierPath 
 - getSmoothStepPath 
 - getStraightPath 
-- getTransformFoBounds
+- getTransformForBounds
 - internalsSymbol
 - isEdge
 - isNode
@@ -899,6 +899,14 @@ client-code.
    :output-dir "out"}}}
 #+end_src
 
+#+begin_src clojure :tangle babel/src/deps.cljs :noweb yes
+{:npm-deps     {:reactflow "<<version>>"}
+ :npm-dev-deps {:create-react-class "^15.7.0"
+	        :react              "^17.0.2-0"
+	        :react-dom          "^17.0.2-0"
+                :shadow-cljs        "^2.16.7"}}
+#+end_src
+
 **** Package.json
 #+begin_src javascript :tangle babel/package.json :noweb yes
 {
@@ -910,7 +918,7 @@ client-code.
 	"create-react-class": "^15.7.0",
 	"react":              "^17.0.2-0",
 	"react-dom":          "^17.0.2-0",
-	"reactflow":          "^<<version>>"
+	"reactflow":          "<<version>>"
     },
     "devDependencies": {
         "shadow-cljs": "^2.16.7"
