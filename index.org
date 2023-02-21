@@ -217,6 +217,7 @@ map with ~x~, ~y~ & ~zoom~ values, just as the hook equivalent.
 #+begin_src clojurescript  :tangle babel/examples/src/drop_it_like_its_hot/core.cljs
 (defn- main []
   (let [flow      (atom nil)
+        provider  (atom nil)
         viewport  (r/atom {:x 0 :y 0 :zoom 1})
         data-type "application/reagentflow"]
     (letfn [(handle-drag [event]
@@ -232,14 +233,15 @@ map with ~x~, ~y~ & ~zoom~ values, just as the hook equivalent.
             (handle-drop [event]
               (.preventDefault event)
               (when-let [node-type (.getData (-> event .-dataTransfer) data-type)]
-                (let [flow-el (-> flow .-state .-firstChild) 
-                      rect    (.getBoundingClientRect flow-el)
-                      x (- (- (.-clientX event) rect.left) (:x @viewport))
-                      y (- (- (.-clientY event) rect.top) (:y @viewport))]
+                (let [{:keys [project]} @provider
+                      flow-el           (-> flow .-state .-firstChild) 
+                      rect              (.getBoundingClientRect flow-el)
+                      position          (project {:x (- (.-clientX event) rect.left)
+                                                  :y (- (.-clientY event) rect.top)})]
                   (swap! node-id inc)
                   (swap! nodes conj {:id       (str "node-" @node-id)
                                      :type     node-type
-                                     :position {:x x :y y}
+                                     :position position
                                      :data     {:label (str "Node #" @node-id)}}))))
             (handle-drag-over [event]
               (.preventDefault event)
@@ -254,6 +256,7 @@ map with ~x~, ~y~ & ~zoom~ values, just as the hook equivalent.
                         :nodes                @nodes
                         :edges                @edges
                         :fit-view             true
+                        :on-init              #(reset! provider %)
                         :on-nodes-change      handle-node-changes
                         :on-edges-change      handle-edge-changes
                         :on-connect           handle-connect
@@ -275,14 +278,15 @@ map with ~x~, ~y~ & ~zoom~ values, just as the hook equivalent.
 #+html: <div class="output" data-src="drop_it_like_its_hot"></div>
 #+html: </div>
 
-** TODO Stress                                                        :noexport:
+** Stress
 
-This example stresstests react-flow rendering in combination with
+This example stress-tests react-flow rendering in combination with
 reagent state-handling.
 #+html: <div class="example">
 #+begin_src clojurescript :tangle babel/examples/src/stress/core.cljs :exports none
 (ns stress.core
   (:require
+   [clojure.set :as set :refer [union]]
    [reagent.core :as r]
    [reagent.dom :as rdom]
    [reagent-flow.core
@@ -291,53 +295,131 @@ reagent state-handling.
             get-connections-by-node-id get-node-by-id]]))
 #+end_src
 
+We create 100 nodes in total; all sorted into a grid with connections
+running between every node. There's one sum-node that adds together
+the value of each of the connected nodes. Only connections that affect
+the sum are animated.
 #+begin_src clojurescript  :tangle babel/examples/src/stress/core.cljs
 (def num-nodes 100)
+(def rows 10)
+(def cols (/ num-nodes rows))
 
-(defonce sum (r/atom 0))
+(defonce sum-node-value (r/atom 0))
+#+end_src
 
+Each node and edge can be uniquely identified and as such also
+modified. Try making a connection from =Node #99= to the =Sum node= and
+see the value of the nodes propagate through the grid.
+#+begin_src clojurescript  :tangle babel/examples/src/stress/core.cljs
 (defonce nodes
-  (let [rows 10]
-    (r/atom (into (->> (range 1 (inc num-nodes))
-                       (mapv (fn [idx]
-                               (let [x (+ 200 (* 200 (max 1 (mod idx rows))))
-                                     y (* 100 (max 1 (Math/round (Math/ceil (/ idx rows)))))]
-                                {:id       (str "node-" idx)
-                                 :position {:x x :y y}
-                                 :data     {:label (str "Node #" idx)
-                                            :value idx}}))))
-                  [{:id       :node-sum
-                    :position {:x 0 :y 0}
-                    :data     {:label (str "Sum: " @sum)}}]))))
+  (r/atom (into (->> (range 1 num-nodes)
+                     (mapv (fn [idx]
+                             (let [x (* 200 (mod idx cols))
+                                   y (* 200 (quot idx cols))]
+                               {:id       (str "node-" idx)
+                                :type     (if (= idx 1) :input :default)
+                                :position {:x x :y y}
+                                :data     {:label (str "Node #" idx)
+                                           :value idx}}))))
+                [{:id        :sum-node
+                  :type      :sum-node
+                  :deletable false
+                  :position  {:x (* 200 (dec cols)) :y (* 200 rows)}}])))
 
 (defonce edges
-  (r/atom (into (->> (range (inc num-nodes))
-                     (mapv (fn [idx]
-                             {:id     (str "edge-" idx)
-                              :source (str "node-" (inc idx))
-                              :target (str "node-" idx)})))
-                [{:id     :edge-sum
-                  :source (str "node-" num-nodes)
-                  :target :node-sum}])))
+  (r/atom (->> (range 1 num-nodes)
+               (mapv (fn [idx]
+                       (merge 
+                        {:id (str "edge-" idx)}
+                        (when (> idx 1)
+                          {:source (str "node-" (dec idx))})
+                        (when (< idx num-nodes)
+                          {:target (str "node-" idx)})))))))
+#+end_src
 
+We use a few helper-functions to achieve this which you can see here.
+#+begin_src clojurescript  :tangle babel/examples/src/stress/core.cljs
+(defn- follow-source [edge connections]
+  (if-let [source (get edge :source)]
+    (let [sources (some #(when (= (name source) (name (:target %))) %) connections)]
+      (conj (follow-source sources connections) edge))
+    [edge]))
+
+(defn- animate [connected connections]
+  (map (fn [connection]
+         (let [connection (dissoc connection :animated)]
+           (if-let [edge (some #(when (= (:target %) (:target connection)) %) connected)]
+             (assoc edge :animated true)
+             connection)))
+       connections))
+
+(defn- sum [connected]
+  (transduce (comp (map :source)
+                (map (partial get-node-by-id @nodes))
+                (map (comp :value :data)))
+             + 0 connected))
+
+(defn- sum-node-edge [connection connections]
+  (or (when (= (:target connection) "sum-node") connection)
+      (first (get-connections-by-node-id connections :sum-node :target))))
+
+(defn- find-connected [connection connections]
+  (sequence
+   (comp (mapcat #(follow-source % connections))
+      (filter some?))
+   [(sum-node-edge connection connections)]))
+#+end_src
+
+Our sum-node is really simple, but it needs to be a function for the
+atom to be de-referenced upon change.
+#+begin_src clojurescript  :tangle babel/examples/src/stress/core.cljs
+(defn- sum-node []
+  [:<>
+   [:pre (str "Sum: " @sum-node-value)]
+   [handle {:id       :sum-handle
+            :type     :target
+            :position :top}]])
+
+(defonce node-types
+  {:sum-node sum-node})
+#+end_src
+
+And here we put the stress example together. Note that we use ~set-center~
+upon initialization and how that is treated as a regular ClojureScript function.
+#+begin_src clojurescript  :tangle babel/examples/src/stress/core.cljs
 (defn- main []
-  (letfn [(handle-node-changes [changes]
-            (reset! nodes (apply-node-changes changes @nodes)))
-          (handle-edge-changes [changes]
-            (reset! edges (apply-edge-changes changes @edges)))
-          (handle-connect [connection]
-            (reset! edges (add-edge connection @edges)))]
+  (letfn [(handle-node-changes [delta]
+            (reset! nodes (apply-node-changes delta @nodes)))
+          (handle-edge-changes [delta]
+            (let [connections (apply-edge-changes delta @edges)]
+              (condp = (-> delta first :type (keyword))
+                :remove (let [connected   (find-connected delta connections)
+                              connections (animate connected connections)]
+                          (reset! sum-node-value (sum connected))
+                          (reset! edges connections))
+                (reset! edges connections))))
+          (handle-connect [delta]
+            (let [delta       (assoc delta :id (str "edge-" (+ 2 (count @edges))))
+                  connections (add-edge delta @edges)
+                  connected   (find-connected delta connections)
+                  connections (animate connected connections)]
+              (reset! sum-node-value (sum connected))
+              (reset! edges connections)))
+          (handle-init [{:keys [set-center] :as provider}]
+            (let [x (* 200 (dec cols))
+                  y (* 200 (dec rows))]
+             (set-center x y {:zoom 0.85})))]
     (fn []
       [reagent-flow {:id                   :stress
                      :nodes                @nodes
                      :edges                @edges
-                     :fit-view             true
+                     :node-types           node-types
                      :on-nodes-change      handle-node-changes
                      :on-edges-change      handle-edge-changes
                      :on-connect           handle-connect
+                     :on-init              handle-init
                      :connection-line-type :smoothstep
-                     :default-edge-options {:animated true
-                                            :type     :smoothstep}}
+                     :default-edge-options {:type :smoothstep}}
        [background]])))
 
 #+end_src
@@ -395,8 +477,8 @@ reagent state-handling.
     "type": "module",
     "dependencies": {
         "create-react-class": "^15.7.0",
-        "react":              "^17.0.2-0",
-        "react-dom":          "^17.0.2-0",
+        "react":              "^17.0.2",
+        "react-dom":          "^17.0.2",
         "reactflow":          "<<version>>"
     },
     "devDependencies": {
@@ -414,7 +496,7 @@ We use the same version-scheme as ReactFlow. You're currently viewing
 version:
 #+name: version
 #+begin_src text
-11.5.5
+11.5.6
 #+end_src
 
 Here you'll find all the names of the classes, functions, hooks, and types of
@@ -588,14 +670,12 @@ this version of ReactFlow listed.
 - EdgeResetChange
 - EdgeChange
 
+*Note that types & hooks can pretty much be ignored, but are still here for completeness sake. If you find the need for them, please tell us about your usecase.*
 
-** TODO Process lists [0/2]
+
+** Process lists
 
 Here the lists above are processed to get the ClojureScript equivalent functionality.
-
-- [ ] Augment symbols with modified documentation from their original
-  equivalent
-- [ ] Thorough reasoning if hooks should be exposed or not
 #+name: refer
 #+begin_src emacs-lisp :var classes=classes()[,0] functions=functions()[,0] hooks=hooks[,0]
 (s-join "\n" (-concat classes functions hooks))
@@ -635,6 +715,7 @@ these processed lists.
 (ns ^{:doc "A ClojureScript library that wraps ReactFlow"}
     reagent-flow.core
   (:require
+   [clojure.set :refer [rename-keys]]
    [clojure.string :as str]
    [cljs.core :refer [IDeref IEditableCollection]]
    [medley.core :refer [map-keys map-vals]]
@@ -680,7 +761,10 @@ helper-functions:
       (keyword)))
 
 (defn- flowjs->clj [o]
-  (js->clj o :keywordize-keys true))
+  (let [obj (js->clj o :keywordize-keys true)]
+    (if (map? obj)
+      (rename-keys obj (zipmap (keys obj) (map ->snake-case (keys obj))))
+      obj)))
 
 (defn- flow-props->clj
   "Convert JavaScript object into a map with idiomatic Clojure
@@ -717,6 +801,13 @@ the other state directly via atoms.
   (let [[params & children] (->params args)
         node-types          (when-let [types (:node-types params)] (react-flowify-component types))
         edge-types          (when-let [types (:edge-types params)] (react-flowify-component types))
+        on-init             (when-let [init (:on-init params)]
+                              (fn [provider]
+                                (let [provider          (flowjs->clj provider)
+                                      {:keys [set-center project]} provider]
+                                  (init (assoc provider
+                                               :set-center (fn [x y & options] (set-center x y (clj->js (first options))))
+                                               :project #(project (clj->js %)))))))
         on-nodes-change     (when-let [node-change (:on-nodes-change params)]
                               (fn [delta] (node-change (flowjs->clj delta))))
         on-edges-change     (when-let [edge-change (:on-edges-change params)]
@@ -730,6 +821,7 @@ the other state directly via atoms.
                                        (map-vals clj->js params)
                                        (when node-types {:node-types node-types})
                                        (when edge-types {:edge-types edge-types})
+                                       (when on-init {:on-init on-init})
                                        (when on-nodes-change {:on-nodes-change on-nodes-change})
                                        (when on-edges-change {:on-edges-change on-edges-change})
                                        (when on-connect {:on-connect on-connect}))]
@@ -878,7 +970,7 @@ client-code.
          reagent/reagent           {:mvn/version "1.1.1"}}
  :paths ["src" "out"]
  :aliases
- {:build       {:extra-deps {thheller/shadow-cljs {:mvn/version "2.20.19"}}
+ {:build       {:extra-deps {thheller/shadow-cljs {:mvn/version "2.20.20"}}
                 :main-opts  ["-m" "shadow.cljs.devtools.cli" "release" "reagent-flow"]}
   :test        {:extra-deps  {olical/cljs-test-runner {:mvn/version "3.8.0"}}
                 :extra-paths ["test" "cljs-test-runner-out/gen"]
@@ -900,11 +992,11 @@ client-code.
 #+end_src
 
 #+begin_src clojure :tangle babel/src/deps.cljs :noweb yes
-{:npm-deps     {:reactflow "<<version>>"}
- :npm-dev-deps {:create-react-class "^15.7.0"
-	        :react              "^17.0.2-0"
-	        :react-dom          "^17.0.2-0"
-                :shadow-cljs        "^2.16.7"}}
+{:npm-deps     {"reactflow" "<<version>>"}
+ :npm-dev-deps {"create-react-class" "^15.7.0"
+	        "react"              "^17.0.2"
+	        "react-dom"          "^17.0.2"
+                "shadow-cljs"        "^2.20.20"}}
 #+end_src
 
 **** Package.json
@@ -916,8 +1008,8 @@ client-code.
     "license": "MIT",
     "dependencies": {
 	"create-react-class": "^15.7.0",
-	"react":              "^17.0.2-0",
-	"react-dom":          "^17.0.2-0",
+	"react":              "^17.0.2",
+	"react-dom":          "^17.0.2",
 	"reactflow":          "<<version>>"
     },
     "devDependencies": {
@@ -958,8 +1050,16 @@ client-code.
     <url>https://github.com/dnv-opensource/reagent-flow</url>
     <connection>scm:git:git://github.com/dnv-opensource/reagent-flow.git</connection>
     <developerConnection>scm:git:ssh://git@github.com/dnv-opensource/reagent-flow.git</developerConnection>
-    <tag>HEAD</tag>
+    <tag>v<<version>></tag>
   </scm>
+
+  <dependencies>
+    <dependency>
+      <groupId></groupId>
+      <artifactId>reactflow</artifactId>
+      <version><<version>></version>
+    </dependency>
+  </dependencies>
 
 </project>
 #+end_src
