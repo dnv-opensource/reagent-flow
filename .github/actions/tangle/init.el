@@ -24,6 +24,8 @@
   :config
   (require 'ox-publish)
   (require 'ox-html)
+  (require 'cider)
+  (require 'cider-client)
   (setq org-babel-clojure-backend 'cider
         org-confirm-babel-evaluate nil
         org-src-fontify-natively t
