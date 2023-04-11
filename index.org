@@ -1156,7 +1156,7 @@ uses the below structure as it's base.
    :jar-file  jar-file})
 
 (defn deploy [_]
-  (let [{:keys [jar-file]} (jar)]
+  (let [{:keys [jar-file]} (jar nil)]
     ((requiring-resolve 'deps-deploy.deps-deploy/deploy)
      {:installer      :remote
       :sign-releases? false
