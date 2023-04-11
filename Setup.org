@@ -29,6 +29,37 @@ should be published, what license to use, etc.
     name)))
 #+end_src
 
+#+name: init
+#+begin_src clojurescript
+(defonce root (atom nil))
+
+(defn error-boundary [& children]
+  (let [error (r/atom nil)]
+    (r/create-class
+     {:display-name                 "ErrorBoundary" 
+      :get-derived-state-from-error (fn [e] #js {})
+      :component-did-catch          (fn [err info] (reset! error [err info])) 
+      :reagent-render
+      (fn [& children]
+        (if (nil? @error)
+          (into [:<>] children)
+          (let [[_ info] @error]
+            [:pre.error
+             [:code (pr-str info)]
+             [:br]
+             [:button {:on-click #(.error js/console info)} "Output stacktrace"]])))})))
+
+(defn ^:export init [element]
+  (when (nil? @root)
+    (reset! root (rdom/create-root element))
+    (rdom/render @root [error-boundary [main]])))
+
+(defn ^:export unload [element]
+  (when (not (nil? @root))
+    (rdom/unmount @root)
+    (reset! root nil)))
+#+end_src
+
 * License
 
 #+name: preamble
@@ -133,6 +164,9 @@ for the documentation-page.
     --background-hs: 0, 0%;
     --background-hsl: var(--background-hs), 100%;
 
+    --warning-hs: 331, 74%;
+    --warning-hsl: var(--warning-hs), 30%;
+
     --function-name-hs: 20, 50%;
     --function-name-hsl: var(--function-name-hs), 40%;
 
@@ -195,6 +229,29 @@ body {
     margin: 0 auto;
     max-width: 110em;
     padding: 3vw;
+}
+
+.error {
+    background: hsl(var(--warning-hsl));
+    border: .5em solid hsl(var(--warning-hs), 20%);
+    color: white;
+    overflow: auto;
+    padding: 2em;
+}
+.error button {
+    --webkit-appearance: none;
+    background: hsl(var(--warning-hs), 20%);
+    border: none;
+    color: white;
+    margin: 1em 0;
+    padding: 0.5em 1em;
+    transition: background .2s ease;
+}
+.error button:hover {
+    background: hsl(var(--warning-hs), 15%);
+}
+.error button:active {
+    background: hsl(var(--warning-hs), 10%);
 }
 #+end_src
 
