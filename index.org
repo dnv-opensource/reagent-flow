@@ -578,7 +578,7 @@ We use the same version-scheme as ReactFlow. You're currently viewing
 version:
 #+name: version
 #+begin_src text
-11.6.1
+11.7.0
 #+end_src
 
 Here you'll find all the names of the classes, functions, hooks, and types of
@@ -782,7 +782,7 @@ Here the lists above are processed to get the ClojureScript equivalent functiona
  (-concat 
   (->> (sort (-concat functions hooks) 's-less?)
        (--map (format "(def ^{:private true} %s %s)" (react->reagent it) (s-trim it))))
-  (--map (format "(def ^{:const true} Flow%s reactflow/%s)" (s-trim it) (s-trim it))
+  (--map (format "(def ^{:const true} Flow%s rf/%s)" (s-trim it) (s-trim it))
          types))
  (s-join "\n" ))
 #+end_src
@@ -794,16 +794,16 @@ With the lists processed, we assemble our core namespace by using
 these processed lists.
 #+begin_src clojurescript :tangle babel/src/reagent_flow/core.cljs :noweb yes
 <<preamble>>
-(ns ^{:doc "A ClojureScript library that wraps ReactFlow"}
-    reagent-flow.core
+(ns reagent-flow.core
+  "A ClojureScript library that wraps ReactFlow"
   (:require
    [clojure.set :refer [rename-keys]]
    [clojure.string :as str]
    [cljs.core :refer [IDeref IEditableCollection]]
    [medley.core :refer [map-keys map-vals]]
    [reagent.core :as r]
-   [reactflow$default :as ReactFlow]
-   [reactflow :as rf
+   ["reactflow$default" :as ReactFlow]
+   ["reactflow" :as rf
     :refer [addEdge
             applyEdgeChanges
             applyNodeChanges
@@ -1049,7 +1049,7 @@ client-code.
 #+begin_src clojure :tangle babel/deps.edn
 {:deps  {org.clojure/clojurescript {:mvn/version "1.11.51"}
          dev.weavejester/medley    {:mvn/version "1.5.0"}
-         reagent/reagent           {:mvn/version "1.1.1"}}
+         reagent/reagent           {:mvn/version "1.2.0"}}
  :paths ["src"]
  :aliases
  {:build   {:extra-deps {thheller/shadow-cljs {:mvn/version "2.20.20"}}
@@ -1057,7 +1057,8 @@ client-code.
   :test    {:extra-deps  {olical/cljs-test-runner {:mvn/version "3.8.0"}}
             :extra-paths ["test" "cljs-test-runner-out/gen"]
             :main-opts   ["-m" "cljs-test-runner.main" "-d" "test"]}
-  :package {:deps       {io.github.clojure/tools.build {:mvn/version "0.9.4"}}
+  :package {:deps       {io.github.clojure/tools.build {:mvn/version "0.9.4"}
+                         slipset/deps-deploy           {:mvn/version "0.2.0"} }
             :ns-default package}}}
 #+end_src
 
@@ -1204,12 +1205,18 @@ clojure -M:test
 
 ** Running examples locally
 
-First publish the documentation
+First make sure that index.org and Setup.org are both tangled.
+#+begin_src emacs-lisp
+(dolist (file '("index.org" "Setup.org"))
+  (org-babel-tangle-file file))
+#+end_src
+
+Then publish the documentation.
 #+begin_src emacs-lisp
 (org-publish-project "reagent-flow")
 #+end_src
 
-then run the shadow watcher in the ~babel/examples~ directory
+Then run the shadow watcher in the ~babel/examples~ directory
 #+begin_src shell :dir babel/examples
 npm i
 clj -M:watch

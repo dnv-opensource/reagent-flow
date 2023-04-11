@@ -28,13 +28,6 @@ jobs:
           cli: 1.11.1.1182
           clj-kondo: 2022.05.31
 
-      - name: Set up JDK 17
-        uses: actions/setup-java@v3
-        with:
-          distribution: "zulu"
-          java-version: "17"
-          cache: "maven"
-
       - name: Build
         shell: bash
         run: |
@@ -42,21 +35,11 @@ jobs:
           npm i
           clojure -M:build
 
-      - name: Package jar
+      - name: Package & deploy
         shell: bash
-        run: |
-          cd babel
-          clojure -T:package jar
-
-      - name: Remove everything except the build
-        shell: bash
-        run: |
-          sudo rm -fr *.org LICENSE docs
-          sudo mv babel/* ./
-          sudo rm -fr babel
-
-      - name: Deploy to Clojars
-        uses: jlesquembre/clojars-publish-action@0.3
         env:
           CLOJARS_USERNAME: ${{ secrets.CLOJARS_USERNAME }}
           CLOJARS_PASSWORD: ${{ secrets.CLOJARS_PASSWORD }}
+        run: |
+          cd babel
+          clojure -T:package deploy
