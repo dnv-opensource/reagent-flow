@@ -73,7 +73,7 @@ We use atoms to store nodes & edges. The nodes you see here with the
             :data        {:label "Pick a color & connect the nodes"}}
            {:id              :c1
             :type            :color-node
-            :className       :color-node
+            :class-name      :color-node
             :position        {:x 60 :y 60}
             :data            {:color "#e6d5d0"}
             :source-position :right}
@@ -303,8 +303,8 @@ running between every node. There's one sum-node that adds together
 the value of each of the connected nodes. Only connections that affect
 the sum are animated.
 #+begin_src clojurescript :exports code
-(def num-nodes 100)
-(def rows 10)
+(def num-nodes 250)
+(def rows (/ num-nodes 10))
 (def cols (/ num-nodes rows))
 
 (defonce sum-node-value (r/atom 0))
@@ -535,24 +535,26 @@ other third party libraries. The library we're using here is [[https://leva.ment
 ** Manifests                                                           :noexport:
 
 *** Deps.edn
-#+begin_src clojure :tangle babel/examples/deps.edn
-{:deps  {org.clojure/clojurescript             {:mvn/version "1.11.51"}
-         reagent/reagent                       {:mvn/version "1.2.0"}
-         re-frame/re-frame                     {:mvn/version "1.3.0"}
-         io.github.mentat-collective/leva.cljs {:git/sha "bb24493c8b4a0fcd862d69b4960fa297561fa5bb"}
-         net.clojars.simtech/reagent-flow      {:local/root "../"}}
+#+begin_src clojurescript :tangle babel/examples/deps.edn
+{:deps  {org.clojure/clojure                             {:mvn/version "1.11.1"}
+         org.clojure/clojurescript                       {:mvn/version "1.11.60"}
+         com.google.javascript/closure-compiler-unshaded {:mvn/version "v20230411"}
+         reagent/reagent                                 {:mvn/version "1.2.0"}
+         re-frame/re-frame                               {:mvn/version "1.3.0"}
+         io.github.mentat-collective/leva.cljs           {:git/sha "bb24493c8b4a0fcd862d69b4960fa297561fa5bb"}
+         net.clojars.simtech/reagent-flow                {:local/root "../"}}
  :paths ["src"]
  :aliases
- {:watch {:extra-deps {thheller/shadow-cljs {:mvn/version "2.20.20"}
+ {:watch {:extra-deps {thheller/shadow-cljs {:mvn/version "2.23.3"}
                        binaryage/devtools   {:mvn/version "1.0.6"}}
           :main-opts  ["-m" "shadow.cljs.devtools.cli" "watch" "examples"]}
-  :build {:extra-deps {thheller/shadow-cljs {:mvn/version "2.20.20"}
+  :build {:extra-deps {thheller/shadow-cljs {:mvn/version "2.23.3"}
                        binaryage/devtools   {:mvn/version "1.0.6"}}
           :main-opts  ["-m" "shadow.cljs.devtools.cli" "compile" "examples"]}}}
 #+end_src
 
 *** Shadow-cljs.edn
-#+begin_src clojure :tangle babel/examples/shadow-cljs.edn
+#+begin_src clojurescript :tangle babel/examples/shadow-cljs.edn
 {:deps  true
  :nrepl {:port 9001}
  :builds
@@ -560,7 +562,9 @@ other third party libraries. The library we're using here is [[https://leva.ment
   {:modules
    {:examples {:entries [custom-nodes.core
                          drop-it-like-its-hot.core
-                         stress.core]}}
+                         stress.core
+                         ;; visual-programming.core
+                         ]}}
    :target     :browser
    :asset-path "js"
    :output-dir "../../docs/js/"
@@ -578,7 +582,7 @@ We use the same version-scheme as ReactFlow. You're currently viewing
 version:
 #+name: version
 #+begin_src text
-11.7.0
+11.7.3
 #+end_src
 
 Here you'll find all the names of the classes, functions, hooks, and types of
@@ -768,7 +772,8 @@ Here the lists above are processed to get the ClojureScript equivalent functiona
 (->> classes
      (--map
       (format "(def %s%s (r/adapt-react-class %s))"
-              (if (equal it "ReactFlow")
+              (if (or (equal it "ReactFlow")
+                      (equal it "ReactFlowProvider"))
                   "^:private "
                 "")
               (react->reagent it)
@@ -781,8 +786,8 @@ Here the lists above are processed to get the ClojureScript equivalent functiona
 (->>
  (-concat 
   (->> (sort (-concat functions hooks) 's-less?)
-       (--map (format "(def ^{:private true} %s %s)" (react->reagent it) (s-trim it))))
-  (--map (format "(def ^{:const true} Flow%s rf/%s)" (s-trim it) (s-trim it))
+       (--map (format "(def ^{:private %s} %s %s)" (if (-contains? '("useUpdateNodeInternals") it) "false" "true") (react->reagent it) (s-trim it))))
+  (--map (format "(def ^{:nodoc true :const true} Flow%s rf/%s)" (s-trim it) (s-trim it))
          types))
  (s-join "\n" ))
 #+end_src
@@ -797,8 +802,10 @@ these processed lists.
 (ns reagent-flow.core
   "A ClojureScript library that wraps ReactFlow"
   (:require
+   [camel-snake-kebab.core :refer [->kebab-case ->snake_case]]
    [clojure.set :refer [rename-keys]]
    [clojure.string :as str]
+   [clojure.walk :refer [postwalk]]
    [cljs.core :refer [IDeref IEditableCollection]]
    [medley.core :refer [map-keys map-vals]]
    [reagent.core :as r]
@@ -825,49 +832,30 @@ helper-functions:
   (cond-> args
     (-> args first map? not) (conj nil)))
 
-(defn- ->kebab-case
-  "Convert string to kebab-casing.
-  
-   See: https://en.wikipedia.org/wiki/Letter_case#Kebab_case"
-  [snake]
-  (let [[start & rest] (str/split (name snake) #"-")]
-    (keyword (apply str start (map str/capitalize rest)))))
-
-(defn- ->snake-case
-  "Convert string to snake-casing.
-
-   See: https://en.wikipedia.org/wiki/Letter_case#Snake_case"
-  [kebab]
-  (-> (name kebab)
-      (str/replace #"[A-Z]" #(str "-" (str/lower-case %1)))
-      (keyword)))
+(defn change-keys
+  "Walks a map and replaces all keys by applying function to the keys."
+  [m f]
+  (let [f (fn [[k v]] (if (or (string? k) (keyword? k)) [(f k) v] [k v]))]
+    (postwalk (fn [x] (if (map? x) (into {} (map f x)) x)) m)))
 
 (defn- flowjs->clj [o]
+  "Convert a JavaScript object to a Clojure map with kebab-cased keys."
   (let [obj (js->clj o :keywordize-keys true)]
     (if (map? obj)
-      (rename-keys obj (zipmap (keys obj) (map ->snake-case (keys obj))))
+      (change-keys obj ->kebab-case)
       obj)))
 
-(defn- flow-props->clj
-  "Convert JavaScript object into a map with idiomatic Clojure
-   snake-cased keys."
-  [props]
-  (->> (flowjs->clj props)
-       (map (fn [prop] (map-keys ->snake-case prop)))
-       (into [])))
-
-(defn- clj->flow-props
-  "Convert Clojure map into a JavaScript object with kebab-cased
-   keys."
-  [props]
-  (->> (map (fn [prop] (map-keys ->kebab-case prop)) props)
+(defn- clj->flowjs
+  "Convert Clojure map into a JavaScript object with snake_cased keys."
+  [o]
+  (->> (change-keys o ->snake_case)
        (clj->js)))
 
 (defn- apply-changes [f delta src]
-  (-> (f (clj->js delta) (clj->flow-props src))
-      (flow-props->clj)))
+  (-> (f (clj->flowjs delta) (clj->flowjs src))
+      (flowjs->clj)))
 
-(defn- react-flowify-component [types]
+(defn- react-flowify [types]
   (clj->js ((partial map-vals r/reactify-component) types)))
 #+end_src
 
@@ -881,11 +869,11 @@ the other state directly via atoms.
 (defn- reagent-flow*
   [[on-viewport-change on-viewport-start on-viewport-end & args]]
   (let [[params & children] (->params args)
-        node-types          (when-let [types (:node-types params)] (react-flowify-component types))
-        edge-types          (when-let [types (:edge-types params)] (react-flowify-component types))
+        node-types          (when-let [types (:node-types params)] (react-flowify types))
+        edge-types          (when-let [types (:edge-types params)] (react-flowify types))
         on-init             (when-let [init (:on-init params)]
                               (fn [provider]
-                                (let [provider          (flowjs->clj provider)
+                                (let [provider                     (flowjs->clj provider)
                                       {:keys [set-center project]} provider]
                                   (init (assoc provider
                                                :set-center (fn [x y & options] (set-center x y (clj->js (first options))))
@@ -895,7 +883,9 @@ the other state directly via atoms.
         on-edges-change     (when-let [edge-change (:on-edges-change params)]
                               (fn [delta] (edge-change (flowjs->clj delta))))
         on-connect          (when-let [connect (:on-connect params)]
-                              (fn [delta] (connect (flowjs->clj  delta ))))
+                              (fn [delta] (connect (flowjs->clj delta))))
+        on-connect-start    (when-let [connect-start (:on-connect-start params)]
+                              (fn [event params] (connect-start event (flowjs->clj params))))
         params              (dissoc params :node-types :edge-types)]
     (fn [[on-viewport-change on-viewport-start on-viewport-end & args]]
       (let [[params & children] (->params args)
@@ -906,7 +896,8 @@ the other state directly via atoms.
                                        (when on-init {:on-init on-init})
                                        (when on-nodes-change {:on-nodes-change on-nodes-change})
                                        (when on-edges-change {:on-edges-change on-edges-change})
-                                       (when on-connect {:on-connect on-connect}))]
+                                       (when on-connect {:on-connect on-connect})
+                                       (when on-connect-start {:on-connect-start on-connect-start}))]
         (when (or (some? on-viewport-change)
                   (some? on-viewport-start)
                   (some? on-viewport-end))
@@ -1046,24 +1037,27 @@ client-code.
 ** Manifests                                                          :noexport:
 
 **** Deps.edn
-#+begin_src clojure :tangle babel/deps.edn
-{:deps  {org.clojure/clojurescript {:mvn/version "1.11.51"}
-         dev.weavejester/medley    {:mvn/version "1.5.0"}
-         reagent/reagent           {:mvn/version "1.2.0"}}
+#+begin_src clojurescript :tangle babel/deps.edn
+{:deps  {org.clojure/clojure                             {:mvn/version "1.11.1"}
+         org.clojure/clojurescript                       {:mvn/version "1.11.60"}
+         com.google.javascript/closure-compiler-unshaded {:mvn/version "v20230411"}
+         camel-snake-kebab/camel-snake-kebab             {:mvn/version "0.4.3"}
+         dev.weavejester/medley                          {:mvn/version "1.5.0"}
+         reagent/reagent                                 {:mvn/version "1.2.0"}}
  :paths ["src"]
  :aliases
- {:build   {:extra-deps {thheller/shadow-cljs {:mvn/version "2.20.20"}}
+ {:build   {:extra-deps {thheller/shadow-cljs {:mvn/version "2.23.3"}}
             :main-opts  ["-m" "shadow.cljs.devtools.cli" "release" "reagent-flow"]}
   :test    {:extra-deps  {olical/cljs-test-runner {:mvn/version "3.8.0"}}
             :extra-paths ["test" "cljs-test-runner-out/gen"]
             :main-opts   ["-m" "cljs-test-runner.main" "-d" "test"]}
   :package {:deps       {io.github.clojure/tools.build {:mvn/version "0.9.4"}
-                         slipset/deps-deploy           {:mvn/version "0.2.0"} }
+                         slipset/deps-deploy           {:mvn/version "0.2.0"}}
             :ns-default package}}}
 #+end_src
 
 **** Shadow-cljs.edn
-#+begin_src clojure :tangle babel/shadow-cljs.edn
+#+begin_src clojurescript :tangle babel/shadow-cljs.edn
 {:deps  true
  :nrepl {:port 9000}
  :builds
@@ -1074,7 +1068,7 @@ client-code.
    :output-dir "target/classes/public/js"}}}
 #+end_src
 
-#+begin_src clojure :tangle babel/src/deps.cljs :noweb yes
+#+begin_src clojurescript :tangle babel/src/deps.cljs :noweb yes
 {:npm-deps {"reactflow" "<<version>>"}}
 #+end_src
 
