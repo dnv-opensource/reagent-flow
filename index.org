@@ -166,7 +166,7 @@ it's render-loop.
                      :on-connect           handle-connect
                      :connection-line-type :smoothstep
                      :default-edge-options {:animated true
-                                            :type :smoothstep}}
+                                            :type     :smoothstep}}
        [background]])))
 #+end_src
 
@@ -843,7 +843,9 @@ helper-functions:
   (let [obj (js->clj o :keywordize-keys true)]
     (if (map? obj)
       (change-keys obj ->kebab-case)
-      obj)))
+      (if (seq? obj)
+        (map flowjs->clj obj)
+        obj))))
 
 (defn- clj->flowjs
   "Convert Clojure map into a JavaScript object with snake_cased keys."
