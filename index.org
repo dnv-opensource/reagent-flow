@@ -802,7 +802,7 @@ these processed lists.
 (ns reagent-flow.core
   "A ClojureScript library that wraps ReactFlow"
   (:require
-   [camel-snake-kebab.core :refer [->kebab-case ->snake_case]]
+   [camel-snake-kebab.core :refer [->kebab-case ->snake_case ->camelCase]]
    [clojure.set :refer [rename-keys]]
    [clojure.string :as str]
    [clojure.walk :refer [postwalk]]
@@ -843,14 +843,14 @@ helper-functions:
   (let [obj (js->clj o :keywordize-keys true)]
     (if (map? obj)
       (change-keys obj ->kebab-case)
-      (if (seq? obj)
+      (if (vector? obj)
         (map flowjs->clj obj)
         obj))))
 
 (defn- clj->flowjs
   "Convert Clojure map into a JavaScript object with snake_cased keys."
   [o]
-  (->> (change-keys o ->snake_case)
+  (->> (change-keys o ->camelCase)
        (clj->js)))
 
 (defn- apply-changes [f delta src]
@@ -891,8 +891,9 @@ the other state directly via atoms.
         params              (dissoc params :node-types :edge-types)]
     (fn [[on-viewport-change on-viewport-start on-viewport-end & args]]
       (let [[params & children] (->params args)
-            params              (merge (dissoc params :node-types :edge-types)
+            params              (merge (dissoc params :node-types :edge-types :edges)
                                        (map-vals clj->js params)
+                                       {:edges (clj->flowjs (:edges params))}
                                        (when node-types {:node-types node-types})
                                        (when edge-types {:edge-types edge-types})
                                        (when on-init {:on-init on-init})
@@ -986,7 +987,7 @@ client-code.
    (defn- custom-node [{:keys [id]}]
      (let [node (flow/get-node-by-id @nodes id)
            data (:data node)]
-       [:p (:label data)])"
+       [:p (:label data)]))"
   [params & children]
   (let [on-viewport-change (:on-viewport-change params)
         on-viewport-start  (:on-viewport-start params)
