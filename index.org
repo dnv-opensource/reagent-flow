@@ -585,6 +585,11 @@ version:
 11.7.4
 #+end_src
 
+#+name: reagent-flow-version
+#+begin_src text
+11.7.5
+#+end_src
+
 Here you'll find all the names of the classes, functions, hooks, and types of
 this version of ReactFlow listed.
 
@@ -1079,7 +1084,7 @@ client-code.
 #+begin_src javascript :tangle babel/package.json :noweb yes
 {
     "name": "reagent-flow",
-    "version": "<<version>>",
+    "version": "<<reagent-flow-version>>",
     "private": true,
     "license": "MIT",
     "dependencies": {
@@ -1127,7 +1132,7 @@ uses the below structure as it's base.
   (:require
    [clojure.tools.build.api :as b]))
 
-(def version "<<version>>")
+(def version "<<reagent-flow-version>>")
 (def lib 'net.clojars.simtech/reagent-flow)
 (def class-dir "target/classes")
 (def basis (b/create-basis {:project "deps.edn"}))
