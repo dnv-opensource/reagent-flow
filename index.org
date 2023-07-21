@@ -587,7 +587,7 @@ version:
 
 #+name: reagent-flow-version
 #+begin_src text
-11.7.5
+11.7.4-clj.01
 #+end_src
 
 Here you'll find all the names of the classes, functions, hooks, and types of
