@@ -582,7 +582,7 @@ We use the same version-scheme as ReactFlow. You're currently viewing
 version:
 #+name: version
 #+begin_src text
-11.7.5
+11.7.4
 #+end_src
 
 Here you'll find all the names of the classes, functions, hooks, and types of
