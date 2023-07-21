@@ -802,7 +802,7 @@ these processed lists.
 (ns reagent-flow.core
   "A ClojureScript library that wraps ReactFlow"
   (:require
-   [camel-snake-kebab.core :refer [->kebab-case ->snake_case ->camelCase]]
+   [camel-snake-kebab.core :refer [->kebab-case ->camelCase]]
    [clojure.set :refer [rename-keys]]
    [clojure.string :as str]
    [clojure.walk :refer [postwalk]]
@@ -848,7 +848,7 @@ helper-functions:
         obj))))
 
 (defn- clj->flowjs
-  "Convert Clojure map into a JavaScript object with snake_cased keys."
+  "Convert Clojure map into a JavaScript object with camelCased keys."
   [o]
   (->> (change-keys o ->camelCase)
        (clj->js)))
