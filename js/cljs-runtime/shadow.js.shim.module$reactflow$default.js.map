@@ -1,0 +1,9 @@
+{
+"version":3,
+"file":"shadow.js.shim.module$reactflow$default.js",
+"lineCount":3,
+"mappings":"AAAAA,IAAKC,CAAAA,OAAL,CAAa,yCAAb,CAAA;AACAC,MAAOC,CAAAA,EAAGC,CAAAA,IAAKC,CAAAA,wBAAf,GAA0CH,MAAOC,CAAAA,EAAGG,CAAAA,OAAV,CAAkB,8CAAlB,EAAkE,EAAlE,CAAA,CAAsE,SAAtE,CAA1C;;",
+"sources":["shadow.js.shim.module$reactflow$default.js"],
+"sourcesContent":["goog.provide(\"shadow.js.shim.module$reactflow$default\");\nshadow.js.shim.module$reactflow$default = shadow.js.require(\"module$node_modules$reactflow$dist$umd$index\", {})[\"default\"];\n"],
+"names":["goog","provide","shadow","js","shim","module$reactflow$default","require"]
+}
