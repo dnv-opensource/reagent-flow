@@ -587,7 +587,7 @@ version:
 
 #+name: reagent-flow-version
 #+begin_src text
-11.7.4-clj.01
+11.7.4-clj.02
 #+end_src
 
 Here you'll find all the names of the classes, functions, hooks, and types of
@@ -603,6 +603,7 @@ this version of ReactFlow listed.
 - Controls
 - EdgeText
 - Handle
+- MiniMap
 - Panel
 - Position
 - ReactFlow
