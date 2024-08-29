@@ -9,7 +9,7 @@
 * Usage
 
 You can mostly follow the [[https://reactflow.dev/docs/][ReactFlow documentation]] and be sure to replace
-"react" with "reagent" and use ~snake-casing~ instead of ~kebabCasing~.
+"react" with "reagent" and use ~kebab-casing~ instead of ~camelCasing~.
 There are some exceptions.
 
 - Types are prefixed with ~Flow~ and uses the original ~camelCasing~.
@@ -47,7 +47,6 @@ You can read more about the API at [[https://cljdoc.org/d/net.clojars.simtech/re
 :header-args:clojurescript: :tangle babel/examples/src/custom_nodes/core.cljs :exports none :noweb yes
 :end:
 
-
 Connect the nodes, pick a color and see the nodes change interactively.
 #+html: <div class="example">
 #+begin_src clojurescript
@@ -57,14 +56,14 @@ Connect the nodes, pick a color and see the nodes change interactively.
    [reagent.dom.client :as rdom]
    [reagent-flow.core
     :refer [add-edge apply-edge-changes apply-node-changes
-            background handle reagent-flow
+            background handle reagent-flow node-resizer
             get-connections-by-node-id get-node-by-id]]))
 #+end_src
 
 We use atoms to store nodes & edges. The nodes you see here with the
 ~types~ parameter are custom nodes.
 #+begin_src clojurescript :exports code
-(defonce nodes
+(def nodes
   (r/atom [{:id          :explanation
             :connectable false
             :draggable   false
@@ -83,7 +82,7 @@ We use atoms to store nodes & edges. The nodes you see here with the
             :data            {:label "Preview color"}
             :target-position :left}]))
 
-(defonce edges
+(def edges
   (r/atom []))
 #+end_src
 
@@ -115,24 +114,28 @@ make changes to our atom above.
 
 As with the color-node, the preview-node uses the ~isConnected~
 parameter. Note that it doesn't follow idiomatic Clojure naming as the
-rest of ReagentFlow. This is due to ReactFlow calling our function directly.
+rest of ReagentFlow. This is due to ReactFlow calling our function
+directly.  Also note how easy it is to make a node resizable.
 #+begin_src clojurescript :exports code
 (defn preview-node [{id             :id
-                     is-connectable :isConnectable}]
+                     is-connectable :isConnectable
+                     selected       :selected}]
   (let [node            (get-node-by-id @nodes id)
         {:keys [label]} (:data node)
         connection      (first (get-connections-by-node-id @edges id))
         source          (get-node-by-id @nodes (:source connection))
         color           (-> source :data :color)]
     [:<>
+     [node-resizer {:is-visible selected
+                    :min-width  80
+                    :min-height 50}]
      [:div {:style (merge {:background-color :white
                            :display          :flex
                            :align-items      :center
                            :justify-content  :center
-                           :width            :10em
-                           :height           :5em
                            :border-radius    :5px
-                           :border           "1px solid black"}
+                           :height           "100%"
+                           :padding          :1em}
                           (when connection {:background-color color}))}
       [:strong {:style {:color  color
                         :filter "invert(100%) grayscale(1)"}} label]]
@@ -167,15 +170,16 @@ it's render-loop.
                      :connection-line-type :smoothstep
                      :default-edge-options {:animated true
                                             :type     :smoothstep}}
-       [background]])))
+       [background {:style {:background-color "#ffffff"}}]])))
 #+end_src
 
-#+begin_src clojurescript  
+#+begin_src clojurescript
 <<init>>
 #+end_src
 
 #+html: <div class="output" data-src="custom_nodes"></div>
 #+html: </div>
+
 
 
 ** Drop it like it’s hot
@@ -237,11 +241,11 @@ map with ~x~, ~y~ & ~zoom~ values, just as the hook equivalent.
             (handle-drop [event]
               (.preventDefault event)
               (when-let [node-type (.getData (-> event .-dataTransfer) data-type)]
-                (let [{:keys [project]} @provider
+                (let [{:keys [screen-to-flow-position]} @provider
                       flow-el           (-> flow .-state .-firstChild) 
                       rect              (.getBoundingClientRect flow-el)
-                      position          (project {:x (- (.-clientX event) rect.left)
-                                                  :y (- (.-clientY event) rect.top)})]
+                      position          (screen-to-flow-position {:x (.-clientX event)
+                                                                  :y (.-clientY event)})]
                   (swap! node-id inc)
                   (swap! nodes conj {:id       (str "node-" @node-id)
                                      :type     node-type
@@ -269,7 +273,7 @@ map with ~x~, ~y~ & ~zoom~ values, just as the hook equivalent.
                         :on-viewport-change   #(reset! viewport %)
                         :connection-line-type :smoothstep
                         :default-edge-options {:type :smoothstep}}
-          [background]]]))))
+          [background {:style {:background-color "#ffffff"}}]]]))))
 #+end_src
 
 #+begin_src clojurescript  :exports code
@@ -303,7 +307,7 @@ running between every node. There's one sum-node that adds together
 the value of each of the connected nodes. Only connections that affect
 the sum are animated.
 #+begin_src clojurescript :exports code
-(def num-nodes 250)
+(def num-nodes 100)
 (def rows (/ num-nodes 10))
 (def cols (/ num-nodes rows))
 
@@ -315,10 +319,10 @@ modified. Try making a connection from =Node #99= to the =Sum node= and
 see the value of the nodes propagate through the grid.
 #+begin_src clojurescript :exports code
 (defonce nodes
-  (r/atom (into (->> (range 1 num-nodes)
+  (r/atom (into (->> (range 1 (inc num-nodes))
                      (mapv (fn [idx]
-                             (let [x (* 200 (mod idx cols))
-                                   y (* 200 (quot idx cols))]
+                             (let [x (* 200 (mod (dec idx) cols))
+                                   y (* 200 (quot (dec idx) cols))]
                                {:id       (str "node-" idx)
                                 :type     (if (= idx 1) :input :default)
                                 :position {:x x :y y}
@@ -330,13 +334,13 @@ see the value of the nodes propagate through the grid.
                   :position  {:x (* 200 (dec cols)) :y (* 200 rows)}}])))
 
 (defonce edges
-  (r/atom (->> (range 1 num-nodes)
+  (r/atom (->> (range 1 (inc num-nodes))
                (mapv (fn [idx]
                        (merge 
                         {:id (str "edge-" idx)}
                         (when (> idx 1)
                           {:source (str "node-" (dec idx))})
-                        (when (< idx num-nodes)
+                        (when (< idx (inc num-nodes))
                           {:target (str "node-" idx)})))))))
 #+end_src
 
@@ -411,7 +415,7 @@ upon initialization and how that is treated as a regular ClojureScript function.
           (handle-init [{:keys [set-center] :as provider}]
             (let [x (* 200 (dec cols))
                   y (* 200 (dec rows))]
-             (set-center x y {:zoom 0.85})))]
+              (set-center x y {:zoom 0.85})))]
     (fn []
       [reagent-flow {:id                   :stress
                      :nodes                @nodes
@@ -423,7 +427,7 @@ upon initialization and how that is treated as a regular ClojureScript function.
                      :on-init              handle-init
                      :connection-line-type :smoothstep
                      :default-edge-options {:type :smoothstep}}
-       [background]])))
+       [background {:style {:background-color "#ffffff"}}]])))
 #+end_src
 
 #+begin_src clojurescript  
@@ -536,20 +540,20 @@ other third party libraries. The library we're using here is [[https://leva.ment
 
 *** Deps.edn
 #+begin_src clojurescript :tangle babel/examples/deps.edn
-{:deps  {org.clojure/clojure                             {:mvn/version "1.11.1"}
-         org.clojure/clojurescript                       {:mvn/version "1.11.60"}
+{:deps  {org.clojure/clojure                             {:mvn/version "1.11.3"}
+         org.clojure/clojurescript                       {:mvn/version "1.11.132"}
          com.google.javascript/closure-compiler-unshaded {:mvn/version "v20230411"}
          reagent/reagent                                 {:mvn/version "1.2.0"}
-         re-frame/re-frame                               {:mvn/version "1.3.0"}
-         ;; io.github.mentat-collective/leva.cljs           {:git/sha "bb24493c8b4a0fcd862d69b4960fa297561fa5bb"}
+         re-frame/re-frame                               {:mvn/version "1.4.3"}
+         ;; io.github.mentat-collective/leva.cljs        {:git/sha "bb24493c8b4a0fcd862d69b4960fa297561fa5bb"}
          net.clojars.simtech/reagent-flow                {:local/root "../"}}
  :paths ["src"]
  :aliases
- {:watch {:extra-deps {thheller/shadow-cljs {:mvn/version "2.23.3"}
-                       binaryage/devtools   {:mvn/version "1.0.6"}}
+ {:watch {:extra-deps {thheller/shadow-cljs {:mvn/version "2.28.14"}
+                       binaryage/devtools   {:mvn/version "1.0.7"}}
           :main-opts  ["-m" "shadow.cljs.devtools.cli" "watch" "examples"]}
-  :build {:extra-deps {thheller/shadow-cljs {:mvn/version "2.23.3"}
-                       binaryage/devtools   {:mvn/version "1.0.6"}}
+  :build {:extra-deps {thheller/shadow-cljs {:mvn/version "2.28.14"}
+                       binaryage/devtools   {:mvn/version "1.0.7"}}
           :main-opts  ["-m" "shadow.cljs.devtools.cli" "compile" "examples"]}}}
 #+end_src
 
@@ -582,12 +586,7 @@ We use the same version-scheme as ReactFlow. You're currently viewing
 version:
 #+name: version
 #+begin_src text
-11.7.4
-#+end_src
-
-#+name: reagent-flow-version
-#+begin_src text
-11.7.4-clj.01
+12.2.0
 #+end_src
 
 Here you'll find all the names of the classes, functions, hooks, and types of
@@ -601,8 +600,13 @@ this version of ReactFlow listed.
 - BezierEdge
 - ControlButton
 - Controls
+- EdgeLabelRenderer
 - EdgeText
 - Handle
+- MiniMap
+- NodeResizer
+- NodeResizeControl
+- NodeToolbar
 - Panel
 - Position
 - ReactFlow
@@ -814,8 +818,8 @@ these processed lists.
    [cljs.core :refer [IDeref IEditableCollection]]
    [medley.core :refer [map-keys map-vals]]
    [reagent.core :as r]
-   ["reactflow$default" :as ReactFlow]
-   ["reactflow" :as rf
+   ["@xyflow/react$default" :as ReactFlow]
+   ["@xyflow/react" :as rf
     :refer [addEdge
             applyEdgeChanges
             applyNodeChanges
@@ -830,6 +834,10 @@ these processed lists.
 To create our main entry-point functions, we need a few private
 helper-functions:
 #+begin_src clojurescript  :tangle babel/src/reagent_flow/core.cljs :noweb yes
+(def -->kebab-case (memoize ->kebab-case))
+
+(def -->camelCase (memoize ->camelCase))
+
 (defn- ->params
   "Normalize arguments to always have the form [props children] like
    hiccup elements."
@@ -837,7 +845,7 @@ helper-functions:
   (cond-> args
     (-> args first map? not) (conj nil)))
 
-(defn change-keys
+(defn- change-keys
   "Walks a map and replaces all keys by applying function to the keys."
   [m f]
   (let [f (fn [[k v]] (if (or (string? k) (keyword? k)) [(f k) v] [k v]))]
@@ -847,7 +855,7 @@ helper-functions:
   "Convert a JavaScript object to a Clojure map with kebab-cased keys."
   (let [obj (js->clj o :keywordize-keys true)]
     (if (map? obj)
-      (change-keys obj ->kebab-case)
+      (change-keys (dissoc obj "") -->kebab-case)
       (if (vector? obj)
         (map flowjs->clj obj)
         obj))))
@@ -855,7 +863,7 @@ helper-functions:
 (defn- clj->flowjs
   "Convert Clojure map into a JavaScript object with camelCased keys."
   [o]
-  (->> (change-keys o ->camelCase)
+  (->> (change-keys o -->camelCase)
        (clj->js)))
 
 (defn- apply-changes [f delta src]
@@ -881,10 +889,10 @@ the other state directly via atoms.
         on-init             (when-let [init (:on-init params)]
                               (fn [provider]
                                 (let [provider                     (flowjs->clj provider)
-                                      {:keys [set-center project]} provider]
+                                      {:keys [set-center screen-to-flow-position]} provider]
                                   (init (assoc provider
                                                :set-center (fn [x y & options] (set-center x y (clj->js (first options))))
-                                               :project #(project (clj->js %)))))))
+                                               :screen-to-flow-position #(screen-to-flow-position (clj->js %)))))))
         on-nodes-change     (when-let [node-change (:on-nodes-change params)]
                               (fn [delta] (node-change (flowjs->clj delta))))
         on-edges-change     (when-let [edge-change (:on-edges-change params)]
@@ -929,17 +937,17 @@ client-code.
 (defn apply-node-changes
   "Returns a vector of nodes with `changes` applied to the `source`."
   [changes source]
-  (apply-changes applyNodeChanges changes source))
+  (vec (apply-changes applyNodeChanges changes source)))
 
 (defn apply-edge-changes
   "Returns a vector of edges with `changes` applied to the `source`."
   [changes source]
-  (apply-changes applyEdgeChanges changes source))
+  (vec (apply-changes applyEdgeChanges changes source)))
 
 (defn add-edge
   "Returns a vector of edges with `edge` added to the `source`."
   [edge source]
-  (apply-changes addEdge edge source))
+  (vec (apply-changes addEdge edge source)))
 
 (defn get-node-by-id
   "Returns a map of the node with `id` from `nodes`. 
@@ -1013,7 +1021,30 @@ client-code.
 (ns reagent-flow.core-test
   (:require
    [cljs.test :refer-macros [deftest testing is]]
-   [reagent-flow.core :refer [get-node-by-id get-connections-by-node-id]]))
+   [clojure.test.check.clojure-test :refer [defspec]]
+   [reagent-flow.core :refer [get-node-by-id get-connections-by-node-id]]
+   [clojure.spec.alpha :as s]
+   [clojure.test.check.properties :as prop]
+   [clojure.test.check.generators :as gen]))
+
+;; Map with string or keyword keys and scalar values
+(s/def ::key (s/and (s/or :str string? :kw keyword?) (complement empty?)))
+(s/def ::value (s/or :string string? :number number? :bool boolean?))
+(s/def ::map (s/map-of ::key ::value))
+(s/def ::nested-map
+  (s/map-of ::key (s/or :map ::map :vec (s/coll-of ::value) :value ::value)))
+
+(defspec test-change-keys 100
+  (prop/for-all [sample-map (s/gen ::nested-map)]
+                (let [transformed (#'reagent-flow.core/change-keys sample-map keyword)]
+                  (is (every? (comp keyword? first) transformed)))))
+
+;; TODO Could use a generative test for `test-flowjs->clj` as well
+(deftest test-flowjs->clj
+  (testing "Ensure flowjs->clj handles JS objects correctly"
+    (let [js-obj {:aKey "value" :nestedObj {:anotherKey 42} :aList [1 2 3]}]
+      (is (= (#'reagent-flow.core/flowjs->clj js-obj)
+             {:a-key "value" :nested-obj {:another-key 42} :a-list [1 2 3]})))))
 
 (deftest getting-node-by-id
   (let [nodes [{:id :node1} {:id :node2}]] 
@@ -1046,21 +1077,22 @@ client-code.
 
 **** Deps.edn
 #+begin_src clojurescript :tangle babel/deps.edn
-{:deps  {org.clojure/clojure                             {:mvn/version "1.11.1"}
-         org.clojure/clojurescript                       {:mvn/version "1.11.60"}
-         com.google.javascript/closure-compiler-unshaded {:mvn/version "v20230411"}
-         camel-snake-kebab/camel-snake-kebab             {:mvn/version "0.4.3"}
-         dev.weavejester/medley                          {:mvn/version "1.5.0"}
-         reagent/reagent                                 {:mvn/version "1.2.0"}}
+{:deps  {org.clojure/clojure                 {:mvn/version "1.11.3"}
+         org.clojure/clojurescript           {:mvn/version "1.11.132"}
+         camel-snake-kebab/camel-snake-kebab {:mvn/version "0.4.3"}
+         dev.weavejester/medley              {:mvn/version "1.8.1"}
+         reagent/reagent                     {:mvn/version "1.2.0"}}
  :paths ["src"]
  :aliases
- {:build   {:extra-deps {thheller/shadow-cljs {:mvn/version "2.23.3"}}
+ {:build   {:extra-deps {thheller/shadow-cljs {:mvn/version "2.28.14"}}
             :main-opts  ["-m" "shadow.cljs.devtools.cli" "release" "reagent-flow"]}
-  :test    {:extra-deps  {olical/cljs-test-runner {:mvn/version "3.8.0"}}
+  :test    {:extra-deps  {olical/cljs-test-runner {:mvn/version "3.8.1"}
+                          org.clojure/test.check {:mvn/version "1.1.1"}}
             :extra-paths ["test" "cljs-test-runner-out/gen"]
             :main-opts   ["-m" "cljs-test-runner.main" "-d" "test"]}
-  :package {:deps       {io.github.clojure/tools.build {:mvn/version "0.9.4"}
-                         slipset/deps-deploy           {:mvn/version "0.2.0"}}
+  :package {:deps       {io.github.clojure/tools.build {:git/url "https://github.com/clojure/tools.build"
+                                                        :git/sha "143611fcf965919f1d9c18a10eeeed319305e034"}
+                         slipset/deps-deploy           {:mvn/version "0.2.2"}}
             :ns-default package}}}
 #+end_src
 
@@ -1077,22 +1109,24 @@ client-code.
 #+end_src
 
 #+begin_src clojurescript :tangle babel/src/deps.cljs :noweb yes
-{:npm-deps {"reactflow" "<<version>>"}}
+{:npm-deps {"@xyflow/react" "<<version>>"
+            "react"         "^18.3.1"
+	    "react-dom"     "^18.3.1"}}
 #+end_src
 
 **** Package.json
 #+begin_src javascript :tangle babel/package.json :noweb yes
 {
     "name": "reagent-flow",
-    "version": "<<reagent-flow-version>>",
+    "version": "<<version>>",
     "private": true,
     "license": "MIT",
     "dependencies": {
-	"reactflow":          "<<version>>"
+	"@xyflow/react":          "<<version>>"
     },
     "devDependencies": {
-	"react":              "^18.2.0",
-	"react-dom":          "^18.2.0"
+	"react":              "^18.3.1",
+	"react-dom":          "^18.3.1"
     }
 }
 #+end_src
@@ -1132,7 +1166,7 @@ uses the below structure as it's base.
   (:require
    [clojure.tools.build.api :as b]))
 
-(def version "<<reagent-flow-version>>")
+(def version "<<version>>")
 (def lib 'net.clojars.simtech/reagent-flow)
 (def class-dir "target/classes")
 (def basis (b/create-basis {:project "deps.edn"}))
