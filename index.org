@@ -1077,11 +1077,11 @@ client-code.
 
 **** Deps.edn
 #+begin_src clojurescript :tangle babel/deps.edn
-{:deps  {org.clojure/clojure                             {:mvn/version "1.11.3"}
-         org.clojure/clojurescript                       {:mvn/version "1.11.132"}
-         camel-snake-kebab/camel-snake-kebab             {:mvn/version "0.4.3"}
-         dev.weavejester/medley                          {:mvn/version "1.8.1"}
-         reagent/reagent                                 {:mvn/version "1.2.0"}}
+{:deps  {org.clojure/clojure                 {:mvn/version "1.11.3"}
+         org.clojure/clojurescript           {:mvn/version "1.11.132"}
+         camel-snake-kebab/camel-snake-kebab {:mvn/version "0.4.3"}
+         dev.weavejester/medley              {:mvn/version "1.8.1"}
+         reagent/reagent                     {:mvn/version "1.2.0"}}
  :paths ["src"]
  :aliases
  {:build   {:extra-deps {thheller/shadow-cljs {:mvn/version "2.28.14"}}
@@ -1090,7 +1090,8 @@ client-code.
                           org.clojure/test.check {:mvn/version "1.1.1"}}
             :extra-paths ["test" "cljs-test-runner-out/gen"]
             :main-opts   ["-m" "cljs-test-runner.main" "-d" "test"]}
-  :package {:deps       {io.github.clojure/tools.build {:mvn/version "0.10.5"}
+  :package {:deps       {io.github.clojure/tools.build {:git/url "https://github.com/clojure/tools.build"
+                                                        :git/sha "143611fcf965919f1d9c18a10eeeed319305e034"}
                          slipset/deps-deploy           {:mvn/version "0.2.2"}}
             :ns-default package}}}
 #+end_src
@@ -1165,7 +1166,7 @@ uses the below structure as it's base.
   (:require
    [clojure.tools.build.api :as b]))
 
-(def version "<<reagent-flow-version>>")
+(def version "<<version>>")
 (def lib 'net.clojars.simtech/reagent-flow)
 (def class-dir "target/classes")
 (def basis (b/create-basis {:project "deps.edn"}))
