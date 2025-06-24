@@ -8,9 +8,10 @@
 
 * Usage
 
-You can mostly follow the [[https://reactflow.dev/docs/][ReactFlow documentation]] and be sure to replace
+You can mostly follow the [[https://reactflow.dev/docs/][ReactFlow documentation]], but make sure to replace
 "react" with "reagent" and use ~kebab-casing~ instead of ~camelCasing~.
-There are some exceptions.
+
+There are a few important exceptions:
 
 - Types are prefixed with ~Flow~ and uses the original ~camelCasing~.
   We recommend using the keyword equivalent instead though, so you
@@ -18,7 +19,7 @@ There are some exceptions.
 
 - The parameters received in ~node-types~ & ~edge-types~ are unchanged, so
   if you want to use them you should apply
-  ~(js->clj props :keywordize-keys true)~.
+  ~(flowjs->clj props)~.
   A nice pattern, is to only rely on the ~id~ from the parameters and do
   look-ups in your state manually.
 #+begin_example clojurescript
@@ -31,6 +32,9 @@ There are some exceptions.
 - Hooks are avoided. You manage state with atoms however you please
   and there are events to listen for viewport-changes on the main
   component; ~reagent-flow~.
+
+- CSS is not automatically included, so you'll have to download the
+  CSS files you'd like from xyflow on github.  
 
 You can read more about the API at [[https://cljdoc.org/d/net.clojars.simtech/reagent-flow/][cljdocs]].
 
@@ -229,41 +233,63 @@ map with ~x~, ~y~ & ~zoom~ values, just as the hook equivalent.
         viewport  (r/atom {:x 0 :y 0 :zoom 1})
         data-type "application/reagentflow"]
     (letfn [(handle-drag [event]
-              (let [data-transfer (-> event .-dataTransfer)]
-                (.setData data-transfer data-type "default")
+              (let [data-transfer (-> event .-dataTransfer)
+                    target        (.-target event)
+                    rect          (.getBoundingClientRect target)
+                    offset-x      (- (.-clientX event) (.-left rect))
+                    offset-y      (- (.-clientY event) (.-top rect))
+                    payload       (js/JSON.stringify
+                                   #js {:type "default"
+                                        :offsetX offset-x
+                                        :offsetY offset-y})]
+                (.setData data-transfer data-type payload)
                 (set! (-> data-transfer .-effectAllowed) "move")))
+            
             (handle-node-changes [changes]
               (reset! nodes (apply-node-changes changes @nodes)))
+            
             (handle-edge-changes [changes]
               (reset! edges (apply-edge-changes changes @edges)))
+            
             (handle-connect [connection]
               (reset! edges (add-edge connection @edges)))
+            
             (handle-drop [event]
               (.preventDefault event)
-              (when-let [node-type (.getData (-> event .-dataTransfer) data-type)]
-                (let [{:keys [screen-to-flow-position]} @provider
-                      flow-el           (-> flow .-state .-firstChild) 
-                      rect              (.getBoundingClientRect flow-el)
-                      position          (screen-to-flow-position {:x (.-clientX event)
-                                                                  :y (.-clientY event)})]
-                  (swap! node-id inc)
-                  (swap! nodes conj {:id       (str "node-" @node-id)
-                                     :type     node-type
-                                     :position position
-                                     :data     {:label (str "Node #" @node-id)}}))))
+              (let [data-json (.getData (-> event .-dataTransfer) data-type)
+                    data      (js/JSON.parse data-json)]
+                (when data
+                  (let [{:keys [screen-to-flow-position]} @provider
+                        flow-el   (-> flow .-state .-firstChild) 
+                        rect      (.getBoundingClientRect flow-el)
+                        mouse-x   (.-clientX event)
+                        mouse-y   (.-clientY event)
+                        drop-pos  (screen-to-flow-position {:x mouse-x
+                                                            :y mouse-y})
+                        node-pos  (screen-to-flow-position {:x (- mouse-x (.-offsetX data))
+                                                            :y (- mouse-y (.-offsetY data))})]
+                    (swap! node-id inc)
+                    (swap! nodes conj {:id       (str "node-" @node-id)
+                                       :type     (.-type data)
+                                       :position node-pos
+                                       :data     {:label (str "Node #" @node-id)}})))))
+
             (handle-drag-over [event]
               (.preventDefault event)
               (set! (-> event .-dataTransfer .-dropEffect) "move"))]
+      
       (fn []
         [:<>
          [:menu.node-palette
           [:div.node {:draggable     true
                       :on-drag-start handle-drag} "Node"]]
+         
          [reagent-flow {:ref                  #(reset! flow %)
                         :id                   :drop-it-like-its-hot
                         :nodes                @nodes
                         :edges                @edges
                         :fit-view             true
+                        :viewport             {:x 200 :y 200 :zoom 1.5}
                         :on-init              #(reset! provider %)
                         :on-nodes-change      handle-node-changes
                         :on-edges-change      handle-edge-changes
@@ -540,20 +566,21 @@ other third party libraries. The library we're using here is [[https://leva.ment
 
 *** Deps.edn
 #+begin_src clojurescript :tangle babel/examples/deps.edn
-{:deps  {org.clojure/clojure                             {:mvn/version "1.11.3"}
-         org.clojure/clojurescript                       {:mvn/version "1.11.132"}
-         com.google.javascript/closure-compiler-unshaded {:mvn/version "v20230411"}
+{:deps  {org.clojure/clojure                             {:mvn/version "1.12.0"}
+         org.clojure/clojurescript                       {:mvn/version "1.12.42"
+                                                          :exclusions [com.google.javascript/closure-compiler-unshaded]}
+         com.google.javascript/closure-compiler-unshaded {:mvn/version "v20250528"}
          reagent/reagent                                 {:mvn/version "1.2.0"}
          re-frame/re-frame                               {:mvn/version "1.4.3"}
          ;; io.github.mentat-collective/leva.cljs        {:git/sha "bb24493c8b4a0fcd862d69b4960fa297561fa5bb"}
          net.clojars.simtech/reagent-flow                {:local/root "../"}}
  :paths ["src"]
  :aliases
- {:watch {:extra-deps {thheller/shadow-cljs {:mvn/version "2.28.14"}
-                       binaryage/devtools   {:mvn/version "1.0.7"}}
+ {:watch {:extra-deps {thheller/shadow-cljs      {:mvn/version "3.1.7"}
+                       binaryage/devtools        {:mvn/version "1.0.7"}}
           :main-opts  ["-m" "shadow.cljs.devtools.cli" "watch" "examples"]}
-  :build {:extra-deps {thheller/shadow-cljs {:mvn/version "2.28.14"}
-                       binaryage/devtools   {:mvn/version "1.0.7"}}
+  :build {:extra-deps {thheller/shadow-cljs      {:mvn/version "3.1.7"}
+                       binaryage/devtools        {:mvn/version "1.0.7"}}
           :main-opts  ["-m" "shadow.cljs.devtools.cli" "compile" "examples"]}}}
 #+end_src
 
@@ -586,7 +613,7 @@ We use the same version-scheme as ReactFlow. You're currently viewing
 version:
 #+name: version
 #+begin_src text
-12.2.0
+12.7.1
 #+end_src
 
 Here you'll find all the names of the classes, functions, hooks, and types of
@@ -665,6 +692,7 @@ this version of ReactFlow listed.
 - XYZPosition 
 - Dimensions
 - Rect
+- AriaLabelConfig
 - Box
 - Transform
 - CoordinateExtent
@@ -714,6 +742,9 @@ this version of ReactFlow listed.
 - OnConnectStartParams 
 - OnConnectStart 
 - OnConnectEnd 
+- OnReconnect  
+- OnReconnectConnectStart 
+- OnReconnectConnectEnd 
 - Viewport 
 - KeyCode 
 - SnapGrid 
@@ -816,7 +847,8 @@ these processed lists.
    [clojure.string :as str]
    [clojure.walk :refer [postwalk]]
    [cljs.core :refer [IDeref IEditableCollection]]
-   [medley.core :refer [map-keys map-vals]]
+   [medley.core :refer [map-vals]]
+   ["react" :as react]
    [reagent.core :as r]
    ["@xyflow/react$default" :as ReactFlow]
    ["@xyflow/react" :as rf
@@ -851,8 +883,9 @@ helper-functions:
   (let [f (fn [[k v]] (if (or (string? k) (keyword? k)) [(f k) v] [k v]))]
     (postwalk (fn [x] (if (map? x) (into {} (map f x)) x)) m)))
 
-(defn- flowjs->clj [o]
+(defn flowjs->clj
   "Convert a JavaScript object to a Clojure map with kebab-cased keys."
+  [o]
   (let [obj (js->clj o :keywordize-keys true)]
     (if (map? obj)
       (change-keys (dissoc obj "") -->kebab-case)
@@ -868,7 +901,7 @@ helper-functions:
 
 (defn- apply-changes [f delta src]
   (-> (f (clj->flowjs delta) (clj->flowjs src))
-      (flowjs->clj)))
+    (flowjs->clj)))
 
 (defn- react-flowify [types]
   (clj->js ((partial map-vals r/reactify-component) types)))
@@ -1014,7 +1047,6 @@ client-code.
              params] children)]]))
 #+end_src
 
-
 ** Tests                                                              :noexport:
 
 #+begin_src clojurescript :tangle babel/test/reagent_flow/core_test.cljs :noweb yes
@@ -1039,7 +1071,6 @@ client-code.
                 (let [transformed (#'reagent-flow.core/change-keys sample-map keyword)]
                   (is (every? (comp keyword? first) transformed)))))
 
-;; TODO Could use a generative test for `test-flowjs->clj` as well
 (deftest test-flowjs->clj
   (testing "Ensure flowjs->clj handles JS objects correctly"
     (let [js-obj {:aKey "value" :nestedObj {:anotherKey 42} :aList [1 2 3]}]
@@ -1077,41 +1108,60 @@ client-code.
 
 **** Deps.edn
 #+begin_src clojurescript :tangle babel/deps.edn
-{:deps  {org.clojure/clojure                 {:mvn/version "1.11.3"}
-         org.clojure/clojurescript           {:mvn/version "1.11.132"}
-         camel-snake-kebab/camel-snake-kebab {:mvn/version "0.4.3"}
-         dev.weavejester/medley              {:mvn/version "1.8.1"}
-         reagent/reagent                     {:mvn/version "1.2.0"}}
+{:deps {org.clojure/clojure                             {:mvn/version "1.12.0"}
+        org.clojure/clojurescript                       {:mvn/version "1.12.42"
+                                                         :exclusions [com.google.javascript/closure-compiler-unshaded]}
+        com.google.javascript/closure-compiler-unshaded {:mvn/version "v20250528"}}
  :paths ["src"]
  :aliases
- {:build   {:extra-deps {thheller/shadow-cljs {:mvn/version "2.28.14"}}
+ {:build   {:extra-deps {thheller/shadow-cljs      {:mvn/version "3.1.7"}}
             :main-opts  ["-m" "shadow.cljs.devtools.cli" "release" "reagent-flow"]}
-  :test    {:extra-deps  {olical/cljs-test-runner {:mvn/version "3.8.1"}
-                          org.clojure/test.check {:mvn/version "1.1.1"}}
-            :extra-paths ["test" "cljs-test-runner-out/gen"]
-            :main-opts   ["-m" "cljs-test-runner.main" "-d" "test"]}
-  :package {:deps       {io.github.clojure/tools.build {:git/url "https://github.com/clojure/tools.build"
-                                                        :git/sha "143611fcf965919f1d9c18a10eeeed319305e034"}
+  :package {:deps       {io.github.clojure/tools.build {:mvn/version "0.10.9"}
                          slipset/deps-deploy           {:mvn/version "0.2.2"}}
             :ns-default package}}}
 #+end_src
 
 **** Shadow-cljs.edn
 #+begin_src clojurescript :tangle babel/shadow-cljs.edn
-{:deps  true
+{:dependencies [[camel-snake-kebab/camel-snake-kebab "0.4.3"]
+                [dev.weavejester/medley "1.8.1"]
+                [reagent/reagent "1.3.0"]]
  :nrepl {:port 9000}
  :builds
  {:reagent-flow
   {:modules {:reagent-flow {:entries [reagent-flow.core]}}
    :target     :browser
    :asset-path "js"
-   :output-dir "target/classes/public/js"}}}
+   :output-dir "target/classes/public/js"}
+  :ci
+  {:target :karma
+   :output-to "out/ci.js"
+   :ns-regexp "-test$"
+   :autorun true}}}
 #+end_src
 
 #+begin_src clojurescript :tangle babel/src/deps.cljs :noweb yes
 {:npm-deps {"@xyflow/react" "<<version>>"
             "react"         "^18.3.1"
 	    "react-dom"     "^18.3.1"}}
+#+end_src
+
+#+begin_src javascript :tangle babel/karma.confg.js
+module.exports = function (config) {
+    config.set({
+        browsers: ['ChromeHeadless'],
+        basePath: 'target',
+        files: ['ci.js'],
+        frameworks: ['cljs-test'],
+        plugins: ['karma-cljs-test', 'karma-chrome-launcher'],
+        colors: true,
+        logLevel: config.LOG_INFO,
+        client: {
+            args: ["shadow.test.karma.init"],
+            singleRun: true
+        }
+    })
+};
 #+end_src
 
 **** Package.json
@@ -1125,8 +1175,11 @@ client-code.
 	"@xyflow/react":          "<<version>>"
     },
     "devDependencies": {
-	"react":              "^18.3.1",
-	"react-dom":          "^18.3.1"
+        "karma":                 "^6.4.4",
+        "karma-chrome-launcher": "^3.2.0",
+        "karma-cljs-test":       "^0.1.0",
+	"react":                 "^18.3.1",
+	"react-dom":             "^18.3.1"
     }
 }
 #+end_src

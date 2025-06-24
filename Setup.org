@@ -85,7 +85,7 @@ should be published, what license to use, etc.
 #+begin_src text :tangle LICENSE :noweb yes
 MIT License
 
-Copyright (C) <<year()>> DNV GL
+Copyright (C) <<year()>> DNV
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -935,11 +935,12 @@ svg.react-flow__connectionline {
 
 /* handle styles */
 .react-flow__resize-control.handle {
-  width: 4px;
-  height: 4px;
+  width: 6px;
+  height: 6px;
   border: 1px solid #fff;
-  border-radius: 1px;
+  border-radius: 3px;
   background-color: var(--xy-resize-background-color, var(--xy-resize-background-color-default));
+  box-shadow: 0 1px 4px 1px var(--xy-controls-box-shadow-default);
   transform: translate(-50%, -50%);
 }
 
@@ -1447,6 +1448,9 @@ a {
 .react-flow__node-color-node {
     background: transparent;
     border: none;
+}
+.react-flow__node-preview-node {
+    mix-blend-mode: difference;
 }
 .color-picker {
     --radius: 0.5em;

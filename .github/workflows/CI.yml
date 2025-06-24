@@ -12,6 +12,9 @@ jobs:
       - id: CI
         uses: ./.github/actions/tangle
 
+      - name: Setup Chrome
+        uses: browser-actions/setup-chrome@v1
+
       - name: Setup Node
         uses: actions/setup-node@v3
         with:
@@ -34,4 +37,5 @@ jobs:
         shell: bash
         run: |
           cd babel
-          clojure -M:test
+          npx shadow-cljs compile ci
+          npx karma start --single-run
