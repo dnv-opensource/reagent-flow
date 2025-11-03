@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<!-- 2025-11-03 Mon 15:00 -->
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Reagent Flow</title>
+<meta name="author" content="Henrik Kjerringvåg" />
+<meta name="generator" content="Org Mode" />
+<meta http-equiv="Permissions-Policy" content="interest-cohort=()">
+<link rel="stylesheet" href="css/docs.css">
+<script defer src="js/examples.js"></script>
+<script defer src="js/docs.js"></script>
+</head>
+<body>
+<div id="content" class="content">
+<h1 class="title">Reagent Flow
+<br>
+<span class="subtitle">A ClojureScript library that wraps <a href="https://reactflow.dev/">ReactFlow</a></span>
+</h1>
+
+<div id="orgd7a5e62" class="figure">
+<p><a href="https://clojars.org/net.clojars.simtech/reagent-flow"><img src="https://img.shields.io/clojars/v/net.clojars.simtech/reagent-flow?include_prereleases&amp;style=flat-square.svg" alt="reagent-flow?include_prereleases&amp;style=flat-square.svg" class="org-svg"></a>
+</p>
+</div>
+<div id="outline-container-org9ab3200" class="outline-2">
+<h2 id="org9ab3200">Usage</h2>
+<div class="outline-text-2" id="text-org9ab3200">
+<p>
+You can mostly follow the <a href="https://reactflow.dev/docs/">ReactFlow documentation</a> and be sure to replace
+"react" with "reagent" and use <code>kebab-casing</code> instead of <code>camelCasing</code>.
+There are some exceptions.
+</p>
+
+<ul class="org-ul">
+<li>Types are prefixed with <code>Flow</code> and uses the original <code>camelCasing</code>.
+We recommend using the keyword equivalent instead though, so you
+could ignore types altogether.</li>
+
+<li>The parameters received in <code>node-types</code> &amp; <code>edge-types</code> are unchanged, so
+if you want to use them you should apply
+<code>(js-&gt;clj props :keywordize-keys true)</code>.
+A nice pattern, is to only rely on the <code>id</code> from the parameters and do
+look-ups in your state manually.</li>
+</ul>
+<pre class="example" id="org00c650f">
+(defn- custom-node [{:keys [id] :as props}]
+     (let [node (flow/get-node-by-id @nodes id)
+           data (:data node)]
+       [:p (:label data)])
+</pre>
+
+<ul class="org-ul">
+<li>Hooks are avoided. You manage state with atoms however you please
+and there are events to listen for viewport-changes on the main
+component; <code>reagent-flow</code>.</li>
+</ul>
+
+<p>
+You can read more about the API at <a href="https://cljdoc.org/d/net.clojars.simtech/reagent-flow/">cljdocs</a>.
+</p>
+
+<p>
+<i>Please examine the examples below to get a better grasp of the aforementioned differences.</i>
+</p>
+</div>
+</div>
+<div id="outline-container-org6d9f8df" class="outline-2">
+<h2 id="org6d9f8df">Examples</h2>
+<div class="outline-text-2" id="text-org6d9f8df">
+</div>
+<div id="outline-container-org954ba56" class="outline-3">
+<h3 id="org954ba56">Custom Nodes</h3>
+<div class="outline-text-3" id="text-org954ba56">
+<p>
+Connect the nodes, pick a color and see the nodes change interactively.
+</p>
+<div class="example">
+<p>
+We use atoms to store nodes &amp; edges. The nodes you see here with the
+<code>types</code> parameter are custom nodes.
+</p>
+<div class="org-src-container">
+<pre class="src src-clojurescript">(<span class="org-keyword">def</span> <span class="org-variable-name">nodes</span>
+  (<span class="org-type">r</span>/atom [{<span class="org-clojure-keyword">:id</span>          <span class="org-clojure-keyword">:explanation</span>
+            <span class="org-clojure-keyword">:connectable</span> <span class="org-constant">false</span>
+            <span class="org-clojure-keyword">:draggable</span>   <span class="org-constant">false</span>
+            <span class="org-clojure-keyword">:selectable</span>  <span class="org-constant">false</span>
+            <span class="org-clojure-keyword">:position</span>    {<span class="org-clojure-keyword">:x</span> 0 <span class="org-clojure-keyword">:y</span> 0}
+            <span class="org-clojure-keyword">:data</span>        {<span class="org-clojure-keyword">:label</span> <span class="org-string">"Pick a color &amp; connect the nodes"</span>}}
+           {<span class="org-clojure-keyword">:id</span>              <span class="org-clojure-keyword">:c1</span>
+            <span class="org-clojure-keyword">:type</span>            <span class="org-clojure-keyword">:color-node</span>
+            <span class="org-clojure-keyword">:class-name</span>      <span class="org-clojure-keyword">:color-node</span>
+            <span class="org-clojure-keyword">:position</span>        {<span class="org-clojure-keyword">:x</span> 60 <span class="org-clojure-keyword">:y</span> 60}
+            <span class="org-clojure-keyword">:data</span>            {<span class="org-clojure-keyword">:color</span> <span class="org-string">"#e6d5d0"</span>}
+            <span class="org-clojure-keyword">:source-position</span> <span class="org-clojure-keyword">:right</span>}
+           {<span class="org-clojure-keyword">:id</span>              <span class="org-clojure-keyword">:p2</span>
+            <span class="org-clojure-keyword">:type</span>            <span class="org-clojure-keyword">:preview-node</span>
+            <span class="org-clojure-keyword">:position</span>        {<span class="org-clojure-keyword">:x</span> 300 <span class="org-clojure-keyword">:y</span> 300}
+            <span class="org-clojure-keyword">:data</span>            {<span class="org-clojure-keyword">:label</span> <span class="org-string">"Preview color"</span>}
+            <span class="org-clojure-keyword">:target-position</span> <span class="org-clojure-keyword">:left</span>}]))
+
+(<span class="org-keyword">def</span> <span class="org-variable-name">edges</span>
+  (<span class="org-type">r</span>/atom []))
+</pre>
+</div>
+
+<p>
+This is the code for the color-node. Note that we use <code>get-node-by-id</code>.
+This will return the node with an associated index, so that we can
+make changes to our atom above.
+</p>
+<div class="org-src-container">
+<pre class="src src-clojurescript">(<span class="org-keyword">defn</span> <span class="org-function-name">color-node</span> [{<span class="org-clojure-keyword">:keys</span> [id data]}]
+  (<span class="org-keyword">let</span> [node          (get-node-by-id @nodes id)
+        default-color (<span class="org-keyword">-&gt;</span> data <span class="org-clojure-keyword">:color</span>)]
+    (<span class="org-keyword">letfn</span> [(handle-change [event]
+              (<span class="org-keyword">let</span> [color (<span class="org-keyword">-&gt;</span> event .-target .-value)
+                    path  [(<span class="org-clojure-keyword">:index</span> node) <span class="org-clojure-keyword">:data</span>]]
+                (swap! nodes update-in path assoc <span class="org-clojure-keyword">:color</span> color)))]
+      (<span class="org-keyword">fn</span> [{is-connectable <span class="org-clojure-keyword">:isConnectable</span>}]
+        (<span class="org-keyword">let</span> [node  (get-node-by-id @nodes id)
+              color (<span class="org-keyword">-&gt;</span> node <span class="org-clojure-keyword">:data</span> <span class="org-clojure-keyword">:color</span>)]
+          [<span class="org-clojure-keyword">:&lt;&gt;</span>
+           [<span class="org-clojure-keyword">:input</span> {<span class="org-clojure-keyword">:class</span>         [<span class="org-clojure-keyword">:nodrag</span> <span class="org-clojure-keyword">:color-picker</span>] 
+                    <span class="org-clojure-keyword">:type</span>          <span class="org-clojure-keyword">:color</span>
+                    <span class="org-clojure-keyword">:on-change</span>     handle-change
+                    <span class="org-clojure-keyword">:value</span>         color
+                    <span class="org-clojure-keyword">:default-value</span> default-color}]
+           [handle {<span class="org-clojure-keyword">:type</span>           <span class="org-clojure-keyword">:source</span>
+                    <span class="org-clojure-keyword">:position</span>       <span class="org-clojure-keyword">:right</span>
+                    <span class="org-clojure-keyword">:id</span>             <span class="org-clojure-keyword">:a</span>
+                    <span class="org-clojure-keyword">:is-connectable</span> is-connectable}]])))))
+</pre>
+</div>
+
+<p>
+As with the color-node, the preview-node uses the <code>isConnected</code>
+parameter. Note that it doesn't follow idiomatic Clojure naming as the
+rest of ReagentFlow. This is due to ReactFlow calling our function
+directly.  Also note how easy it is to make a node resizable.
+</p>
+<div class="org-src-container">
+<pre class="src src-clojurescript">(<span class="org-keyword">defn</span> <span class="org-function-name">preview-node</span> [{id             <span class="org-clojure-keyword">:id</span>
+                     is-connectable <span class="org-clojure-keyword">:isConnectable</span>
+                     selected       <span class="org-clojure-keyword">:selected</span>}]
+  (<span class="org-keyword">let</span> [node            (get-node-by-id @nodes id)
+        {<span class="org-clojure-keyword">:keys</span> [label]} (<span class="org-clojure-keyword">:data</span> node)
+        connection      (first (get-connections-by-node-id @edges id))
+        source          (get-node-by-id @nodes (<span class="org-clojure-keyword">:source</span> connection))
+        color           (<span class="org-keyword">-&gt;</span> source <span class="org-clojure-keyword">:data</span> <span class="org-clojure-keyword">:color</span>)]
+    [<span class="org-clojure-keyword">:&lt;&gt;</span>
+     [node-resizer {<span class="org-clojure-keyword">:is-visible</span> selected
+                    <span class="org-clojure-keyword">:min-width</span>  80
+                    <span class="org-clojure-keyword">:min-height</span> 50}]
+     [<span class="org-clojure-keyword">:div</span> {<span class="org-clojure-keyword">:style</span> (merge {<span class="org-clojure-keyword">:background-color</span> <span class="org-clojure-keyword">:white</span>
+                           <span class="org-clojure-keyword">:display</span>          <span class="org-clojure-keyword">:flex</span>
+                           <span class="org-clojure-keyword">:align-items</span>      <span class="org-clojure-keyword">:center</span>
+                           <span class="org-clojure-keyword">:justify-content</span>  <span class="org-clojure-keyword">:center</span>
+                           <span class="org-clojure-keyword">:border-radius</span>    <span class="org-clojure-keyword">:5px</span>
+                           <span class="org-clojure-keyword">:height</span>           <span class="org-string">"100%"</span>
+                           <span class="org-clojure-keyword">:padding</span>          <span class="org-clojure-keyword">:1em</span>}
+                          (<span class="org-keyword">when</span> connection {<span class="org-clojure-keyword">:background-color</span> color}))}
+      [<span class="org-clojure-keyword">:strong</span> {<span class="org-clojure-keyword">:style</span> {<span class="org-clojure-keyword">:color</span>  color
+                        <span class="org-clojure-keyword">:filter</span> <span class="org-string">"invert(100%) grayscale(1)"</span>}} label]]
+     [handle {<span class="org-clojure-keyword">:type</span>           <span class="org-clojure-keyword">:target</span>
+              <span class="org-clojure-keyword">:position</span>       <span class="org-clojure-keyword">:left</span>
+              <span class="org-clojure-keyword">:id</span>             <span class="org-clojure-keyword">:b</span>
+              <span class="org-clojure-keyword">:is-connectable</span> is-connectable}]]))
+
+(<span class="org-keyword">defonce</span> <span class="org-variable-name">node-types</span>
+  {<span class="org-clojure-keyword">:color-node</span>   color-node
+   <span class="org-clojure-keyword">:preview-node</span> preview-node})
+</pre>
+</div>
+
+<p>
+As with ReactFlow, we need to define our event-handlers outside of
+it's render-loop.
+</p>
+<div class="org-src-container">
+<pre class="src src-clojurescript">(<span class="org-keyword">defn-</span> <span class="org-function-name">main</span> []
+  (<span class="org-keyword">letfn</span> [(handle-node-changes [changes]
+            (reset! nodes (apply-node-changes changes @nodes)))
+          (handle-edge-changes [changes]
+            (reset! edges (apply-edge-changes changes @edges)))
+          (handle-connect [connection]
+            (reset! edges (add-edge connection @edges)))]
+    (<span class="org-keyword">fn</span> []
+      [reagent-flow {<span class="org-clojure-keyword">:nodes</span>                @nodes
+                     <span class="org-clojure-keyword">:edges</span>                @edges
+                     <span class="org-clojure-keyword">:node-types</span>           node-types
+                     <span class="org-clojure-keyword">:fit-view</span>             <span class="org-constant">true</span>
+                     <span class="org-clojure-keyword">:on-nodes-change</span>      handle-node-changes
+                     <span class="org-clojure-keyword">:on-edges-change</span>      handle-edge-changes
+                     <span class="org-clojure-keyword">:on-connect</span>           handle-connect
+                     <span class="org-clojure-keyword">:connection-line-type</span> <span class="org-clojure-keyword">:smoothstep</span>
+                     <span class="org-clojure-keyword">:default-edge-options</span> {<span class="org-clojure-keyword">:animated</span> <span class="org-constant">true</span>
+                                            <span class="org-clojure-keyword">:type</span>     <span class="org-clojure-keyword">:smoothstep</span>}}
+       [background {<span class="org-clojure-keyword">:style</span> {<span class="org-clojure-keyword">:background-color</span> <span class="org-string">"#ffffff"</span>}}]])))
+</pre>
+</div>
+
+<div class="output" data-src="custom_nodes"></div>
+</div>
+</div>
+</div>
+<div id="outline-container-org8c29699" class="outline-3">
+<h3 id="org8c29699">Drop it like it’s hot</h3>
+<div class="outline-text-3" id="text-org8c29699">
+<p>
+Drag &amp; drop nodes from a top panel and onto the graph. Edges can be
+connected and disconnected per usual.
+</p>
+<div class="example">
+<p>
+Here you can note the use of <code>on-viewport-change</code> which is not part of the
+original ReactFlow component. In ReactFlow, this is available as a
+hook, but we try to avoid hooks for simplicity. The handler receives a
+map with <code>x</code>, <code>y</code> &amp; <code>zoom</code> values, just as the hook equivalent.
+</p>
+<div class="org-src-container">
+<pre class="src src-clojurescript">(<span class="org-keyword">defn-</span> <span class="org-function-name">main</span> []
+  (<span class="org-keyword">let</span> [flow      (atom <span class="org-constant">nil</span>)
+        provider  (atom <span class="org-constant">nil</span>)
+        viewport  (<span class="org-type">r</span>/atom {<span class="org-clojure-keyword">:x</span> 0 <span class="org-clojure-keyword">:y</span> 0 <span class="org-clojure-keyword">:zoom</span> 1})
+        data-type <span class="org-string">"application/reagentflow"</span>]
+    (<span class="org-keyword">letfn</span> [(handle-drag [event]
+              (<span class="org-keyword">let</span> [data-transfer (<span class="org-keyword">-&gt;</span> event .-dataTransfer)]
+                (.setData data-transfer data-type <span class="org-string">"default"</span>)
+                (<span class="org-keyword">set!</span> (<span class="org-keyword">-&gt;</span> data-transfer .-effectAllowed) <span class="org-string">"move"</span>)))
+            (handle-node-changes [changes]
+              (reset! nodes (apply-node-changes changes @nodes)))
+            (handle-edge-changes [changes]
+              (reset! edges (apply-edge-changes changes @edges)))
+            (handle-connect [connection]
+              (reset! edges (add-edge connection @edges)))
+            (handle-drop [event]
+              (.preventDefault event)
+              (<span class="org-keyword">when-let</span> [node-type (.getData (<span class="org-keyword">-&gt;</span> event .-dataTransfer) data-type)]
+                (<span class="org-keyword">let</span> [{<span class="org-clojure-keyword">:keys</span> [screen-to-flow-position]} @provider
+                      flow-el           (<span class="org-keyword">-&gt;</span> flow .-state .-firstChild) 
+                      rect              (.getBoundingClientRect flow-el)
+                      position          (screen-to-flow-position {<span class="org-clojure-keyword">:x</span> (.-clientX event)
+                                                                  <span class="org-clojure-keyword">:y</span> (.-clientY event)})]
+                  (swap! node-id inc)
+                  (swap! nodes conj {<span class="org-clojure-keyword">:id</span>       (str <span class="org-string">"node-"</span> @node-id)
+                                     <span class="org-clojure-keyword">:type</span>     node-type
+                                     <span class="org-clojure-keyword">:position</span> position
+                                     <span class="org-clojure-keyword">:data</span>     {<span class="org-clojure-keyword">:label</span> (str <span class="org-string">"Node #"</span> @node-id)}}))))
+            (handle-drag-over [event]
+              (.preventDefault event)
+              (<span class="org-keyword">set!</span> (<span class="org-keyword">-&gt;</span> event .-dataTransfer .-dropEffect) <span class="org-string">"move"</span>))]
+      (<span class="org-keyword">fn</span> []
+        [<span class="org-clojure-keyword">:&lt;&gt;</span>
+         [<span class="org-clojure-keyword">:menu.node-palette</span>
+          [<span class="org-clojure-keyword">:div.node</span> {<span class="org-clojure-keyword">:draggable</span>     <span class="org-constant">true</span>
+                      <span class="org-clojure-keyword">:on-drag-start</span> handle-drag} <span class="org-string">"Node"</span>]]
+         [reagent-flow {<span class="org-clojure-keyword">:ref</span>                  #(reset! flow <span class="org-variable-name">%</span>)
+                        <span class="org-clojure-keyword">:id</span>                   <span class="org-clojure-keyword">:drop-it-like-its-hot</span>
+                        <span class="org-clojure-keyword">:nodes</span>                @nodes
+                        <span class="org-clojure-keyword">:edges</span>                @edges
+                        <span class="org-clojure-keyword">:fit-view</span>             <span class="org-constant">true</span>
+                        <span class="org-clojure-keyword">:on-init</span>              #(reset! provider <span class="org-variable-name">%</span>)
+                        <span class="org-clojure-keyword">:on-nodes-change</span>      handle-node-changes
+                        <span class="org-clojure-keyword">:on-edges-change</span>      handle-edge-changes
+                        <span class="org-clojure-keyword">:on-connect</span>           handle-connect
+                        <span class="org-clojure-keyword">:on-drop</span>              handle-drop
+                        <span class="org-clojure-keyword">:on-drag-over</span>         handle-drag-over
+                        <span class="org-clojure-keyword">:on-viewport-change</span>   #(reset! viewport <span class="org-variable-name">%</span>)
+                        <span class="org-clojure-keyword">:connection-line-type</span> <span class="org-clojure-keyword">:smoothstep</span>
+                        <span class="org-clojure-keyword">:default-edge-options</span> {<span class="org-clojure-keyword">:type</span> <span class="org-clojure-keyword">:smoothstep</span>}}
+          [background {<span class="org-clojure-keyword">:style</span> {<span class="org-clojure-keyword">:background-color</span> <span class="org-string">"#ffffff"</span>}}]]]))))
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-clojurescript">(<span class="org-keyword">defonce</span> <span class="org-variable-name">root</span> (atom <span class="org-constant">nil</span>))
+
+(<span class="org-keyword">defn</span> <span class="org-function-name">error-boundary</span> [&amp; children]
+  (<span class="org-keyword">let</span> [error (<span class="org-type">r</span>/atom <span class="org-constant">nil</span>)]
+    (<span class="org-type">r</span>/create-class
+     {<span class="org-clojure-keyword">:display-name</span>                 <span class="org-string">"ErrorBoundary"</span> 
+      <span class="org-clojure-keyword">:get-derived-state-from-error</span> (<span class="org-keyword">fn</span> [e] #js {})
+      <span class="org-clojure-keyword">:component-did-catch</span>          (<span class="org-keyword">fn</span> [err info] (reset! error [err info])) 
+      <span class="org-clojure-keyword">:reagent-render</span>
+      (<span class="org-keyword">fn</span> [&amp; children]
+        (<span class="org-keyword">if</span> (nil? @error)
+          (into [<span class="org-clojure-keyword">:&lt;&gt;</span>] children)
+          (<span class="org-keyword">let</span> [[_ info] @error]
+            [<span class="org-clojure-keyword">:pre.error</span>
+             [<span class="org-clojure-keyword">:code</span> (pr-str info)]
+             [<span class="org-clojure-keyword">:br</span>]
+             [<span class="org-clojure-keyword">:button</span> {<span class="org-clojure-keyword">:on-click</span> #(.error <span class="org-type">js</span>/console info)} <span class="org-string">"Output stacktrace"</span>]])))})))
+
+(<span class="org-keyword">defn</span> ^<span class="org-clojure-keyword">:export</span> <span class="org-function-name">init</span> [element]
+  (<span class="org-keyword">when</span> (nil? @root)
+    (reset! root (<span class="org-type">rdom</span>/create-root element))
+    (<span class="org-type">rdom</span>/render @root [error-boundary [main]])))
+
+(<span class="org-keyword">defn</span> ^<span class="org-clojure-keyword">:export</span> <span class="org-function-name">unload</span> [element]
+  (<span class="org-keyword">when</span> (not (nil? @root))
+    (<span class="org-type">rdom</span>/unmount @root)
+    (reset! root <span class="org-constant">nil</span>)))
+</pre>
+</div>
+
+<div class="output" data-src="drop_it_like_its_hot"></div>
+</div>
+</div>
+</div>
+<div id="outline-container-org64bd380" class="outline-3">
+<h3 id="org64bd380">Stress</h3>
+<div class="outline-text-3" id="text-org64bd380">
+<p>
+This example stress-tests react-flow rendering in combination with
+reagent state-handling.
+</p>
+<div class="example">
+<p>
+We create 100 nodes in total; all sorted into a grid with connections
+running between every node. There's one sum-node that adds together
+the value of each of the connected nodes. Only connections that affect
+the sum are animated.
+</p>
+<div class="org-src-container">
+<pre class="src src-clojurescript">(<span class="org-keyword">def</span> <span class="org-variable-name">num-nodes</span> 100)
+(<span class="org-keyword">def</span> <span class="org-variable-name">rows</span> (/ num-nodes 10))
+(<span class="org-keyword">def</span> <span class="org-variable-name">cols</span> (/ num-nodes rows))
+
+(<span class="org-keyword">defonce</span> <span class="org-variable-name">sum-node-value</span> (<span class="org-type">r</span>/atom 0))
+</pre>
+</div>
+
+<p>
+Each node and edge can be uniquely identified and as such also
+modified. Try making a connection from <code>Node #99</code> to the <code>Sum node</code> and
+see the value of the nodes propagate through the grid.
+</p>
+<div class="org-src-container">
+<pre class="src src-clojurescript">(<span class="org-keyword">defonce</span> <span class="org-variable-name">nodes</span>
+  (<span class="org-type">r</span>/atom (into (<span class="org-keyword">-&gt;&gt;</span> (range 1 (inc num-nodes))
+                     (mapv (<span class="org-keyword">fn</span> [idx]
+                             (<span class="org-keyword">let</span> [x (* 200 (mod (dec idx) cols))
+                                   y (* 200 (quot (dec idx) cols))]
+                               {<span class="org-clojure-keyword">:id</span>       (str <span class="org-string">"node-"</span> idx)
+                                <span class="org-clojure-keyword">:type</span>     (<span class="org-keyword">if</span> (= idx 1) <span class="org-clojure-keyword">:input</span> <span class="org-clojure-keyword">:default</span>)
+                                <span class="org-clojure-keyword">:position</span> {<span class="org-clojure-keyword">:x</span> x <span class="org-clojure-keyword">:y</span> y}
+                                <span class="org-clojure-keyword">:data</span>     {<span class="org-clojure-keyword">:label</span> (str <span class="org-string">"Node #"</span> idx)
+                                           <span class="org-clojure-keyword">:value</span> idx}}))))
+                [{<span class="org-clojure-keyword">:id</span>        <span class="org-clojure-keyword">:sum-node</span>
+                  <span class="org-clojure-keyword">:type</span>      <span class="org-clojure-keyword">:sum-node</span>
+                  <span class="org-clojure-keyword">:deletable</span> <span class="org-constant">false</span>
+                  <span class="org-clojure-keyword">:position</span>  {<span class="org-clojure-keyword">:x</span> (* 200 (dec cols)) <span class="org-clojure-keyword">:y</span> (* 200 rows)}}])))
+
+(<span class="org-keyword">defonce</span> <span class="org-variable-name">edges</span>
+  (<span class="org-type">r</span>/atom (<span class="org-keyword">-&gt;&gt;</span> (range 1 (inc num-nodes))
+               (mapv (<span class="org-keyword">fn</span> [idx]
+                       (merge 
+                        {<span class="org-clojure-keyword">:id</span> (str <span class="org-string">"edge-"</span> idx)}
+                        (<span class="org-keyword">when</span> (&gt; idx 1)
+                          {<span class="org-clojure-keyword">:source</span> (str <span class="org-string">"node-"</span> (dec idx))})
+                        (<span class="org-keyword">when</span> (&lt; idx (inc num-nodes))
+                          {<span class="org-clojure-keyword">:target</span> (str <span class="org-string">"node-"</span> idx)})))))))
+</pre>
+</div>
+
+<p>
+We use a few helper-functions to achieve this which you can see here.
+</p>
+<div class="org-src-container">
+<pre class="src src-clojurescript">(<span class="org-keyword">defn-</span> <span class="org-function-name">follow-source</span> [edge connections]
+  (<span class="org-keyword">if-let</span> [source (get edge <span class="org-clojure-keyword">:source</span>)]
+    (<span class="org-keyword">let</span> [sources (some #(<span class="org-keyword">when</span> (= (name source) (name (<span class="org-clojure-keyword">:target</span> <span class="org-variable-name">%</span>))) <span class="org-variable-name">%</span>) connections)]
+      (conj (follow-source sources connections) edge))
+    [edge]))
+
+(<span class="org-keyword">defn-</span> <span class="org-function-name">animate</span> [connected connections]
+  (map (<span class="org-keyword">fn</span> [connection]
+         (<span class="org-keyword">let</span> [connection (dissoc connection <span class="org-clojure-keyword">:animated</span>)]
+           (<span class="org-keyword">if-let</span> [edge (some #(<span class="org-keyword">when</span> (= (<span class="org-clojure-keyword">:target</span> <span class="org-variable-name">%</span>) (<span class="org-clojure-keyword">:target</span> connection)) <span class="org-variable-name">%</span>) connected)]
+             (assoc edge <span class="org-clojure-keyword">:animated</span> <span class="org-constant">true</span>)
+             connection)))
+       connections))
+
+(<span class="org-keyword">defn-</span> <span class="org-function-name">sum</span> [connected]
+  (transduce (comp (map <span class="org-clojure-keyword">:source</span>)
+                (map (partial get-node-by-id @nodes))
+                (map (comp <span class="org-clojure-keyword">:value</span> <span class="org-clojure-keyword">:data</span>)))
+             + 0 connected))
+
+(<span class="org-keyword">defn-</span> <span class="org-function-name">sum-node-edge</span> [connection connections]
+  (<span class="org-keyword">or</span> (<span class="org-keyword">when</span> (= (<span class="org-clojure-keyword">:target</span> connection) <span class="org-string">"sum-node"</span>) connection)
+      (first (get-connections-by-node-id connections <span class="org-clojure-keyword">:sum-node</span> <span class="org-clojure-keyword">:target</span>))))
+
+(<span class="org-keyword">defn-</span> <span class="org-function-name">find-connected</span> [connection connections]
+  (sequence
+   (comp (mapcat #(follow-source <span class="org-variable-name">%</span> connections))
+      (filter some?))
+   [(sum-node-edge connection connections)]))
+</pre>
+</div>
+
+<p>
+Our sum-node is really simple, but it needs to be a function for the
+atom to be de-referenced upon change.
+</p>
+<div class="org-src-container">
+<pre class="src src-clojurescript">(<span class="org-keyword">defn-</span> <span class="org-function-name">sum-node</span> []
+  [<span class="org-clojure-keyword">:&lt;&gt;</span>
+   [<span class="org-clojure-keyword">:pre</span> (str <span class="org-string">"Sum: "</span> @sum-node-value)]
+   [handle {<span class="org-clojure-keyword">:id</span>       <span class="org-clojure-keyword">:sum-handle</span>
+            <span class="org-clojure-keyword">:type</span>     <span class="org-clojure-keyword">:target</span>
+            <span class="org-clojure-keyword">:position</span> <span class="org-clojure-keyword">:top</span>}]])
+
+(<span class="org-keyword">defonce</span> <span class="org-variable-name">node-types</span>
+  {<span class="org-clojure-keyword">:sum-node</span> sum-node})
+</pre>
+</div>
+
+<p>
+And here we put the stress example together. Note that we use <code>set-center</code>
+upon initialization and how that is treated as a regular ClojureScript function.
+</p>
+<div class="output" data-src="stress"></div>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-org3533f3f" class="outline-2">
+<h2 id="org3533f3f">Contributing</h2>
+<div class="outline-text-2" id="text-org3533f3f">
+<p>
+The repository for this library can be found on <a href="https://github.com/dnv-opensource/reagent-flow/">github</a>.
+</p>
+
+<p>
+As mentioned, reagent-flow is just a wrapper, so there's not much
+logic here. If you discover any issues, those are likely to stem from
+<a href="https://github.com/wbkd/react-flow">ReactFlow</a> and should be reported there. If you are confident that
+you've discovered an issue with this wrapper or have some feedback,
+feel free to open an <a href="https://github.com/dnv-opensource/reagent-flow/issues/new/choose">issue</a>.
+</p>
+
+<p>
+The wrapper is written in a literate style using <a href="https://orgmode.org/">org-mode</a>; so
+to contribute code, the easiest path is to use Emacs for the time being.
+All code, tests and documentation is in <code>index.org</code>, from there it's
+about tangling and weaving the document:
+</p>
+
+<ul class="org-ul">
+<li><code>C-c C-v t</code> will tangle the source-code into files on disk (<code>babel/</code>).</li>
+<li><code>M-x org-publish-project</code> &amp; <code>reagent-flow</code> will weave the documentation
+onto the filesystem (<code>docs/</code>).</li>
+</ul>
+
+<p>
+After having done this, you should be able to build &amp; run tests locally:
+</p>
+</div>
+<div id="outline-container-orgf877de5" class="outline-3">
+<h3 id="orgf877de5">Building</h3>
+<div class="outline-text-3" id="text-orgf877de5">
+<div class="org-src-container">
+<pre class="src src-shell">npm i
+clojure -M:build
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-org23645b2" class="outline-3">
+<h3 id="org23645b2">Running tests</h3>
+<div class="outline-text-3" id="text-org23645b2">
+<div class="org-src-container">
+<pre class="src src-shell">clojure -M:test
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-org6ef91d1" class="outline-3">
+<h3 id="org6ef91d1">Running examples locally</h3>
+<div class="outline-text-3" id="text-org6ef91d1">
+<p>
+First make sure that index.org and Setup.org are both tangled.
+</p>
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span class="org-keyword">dolist</span> (file '(<span class="org-string">"index.org"</span> <span class="org-string">"Setup.org"</span>))
+  (org-babel-tangle-file file))
+</pre>
+</div>
+
+<p>
+Then publish the documentation.
+</p>
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(org-publish-project <span class="org-string">"reagent-flow"</span>)
+</pre>
+</div>
+
+<p>
+Then run the shadow watcher in the <code>babel/examples</code> directory
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">npm i
+clj -M:watch
+</pre>
+</div>
+
+<p>
+and follow the instructions that appear.
+</p>
+</div>
+</div>
+<div id="outline-container-orgebd08ea" class="outline-3">
+<h3 id="orgebd08ea">Publishing</h3>
+<div class="outline-text-3" id="text-orgebd08ea">
+<p>
+Whenever a pull-request is merged into <code>main</code>, a github-action takes
+over. The action will build &amp; run tests. If the tests pass ✓️, the
+library will be packed into a jar. To actually publish to <a href="https://clojars.org">Clojars</a> and
+update github pages with the latest documentation, you'll have to
+create a tag.
+</p>
+</div>
+</div>
+</div>
+</div>
+</body>
+</html>

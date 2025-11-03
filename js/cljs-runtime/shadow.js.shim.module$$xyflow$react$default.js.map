@@ -1,0 +1,9 @@
+{
+"version":3,
+"file":"shadow.js.shim.module$$xyflow$react$default.js",
+"lineCount":3,
+"mappings":"AAAAA,IAAKC,CAAAA,OAAL,CAAa,6CAAb,CAAA;AACAC,MAAOC,CAAAA,EAAGC,CAAAA,IAAKC,CAAAA,4BAAf,GAA8CH,MAAOC,CAAAA,EAAGG,CAAAA,OAAV,CAAkB,kDAAlB,EAAsE,EAAtE,CAAA,CAA0E,SAA1E,CAA9C;;",
+"sources":["shadow.js.shim.module$$xyflow$react$default.js"],
+"sourcesContent":["goog.provide(\"shadow.js.shim.module$$xyflow$react$default\");\nshadow.js.shim.module$$xyflow$react$default = shadow.js.require(\"module$node_modules$$xyflow$react$dist$umd$index\", {})[\"default\"];\n"],
+"names":["goog","provide","shadow","js","shim","module$$xyflow$react$default","require"]
+}
