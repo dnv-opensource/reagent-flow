@@ -7,31 +7,56 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - id: CI
         uses: ./.github/actions/tangle
 
       - name: Setup Node
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: 18
+          cache: npm
+          cache-dependency-path: babel/package-lock.json
 
       - name: Setup Clojure
-        uses: DeLaGuardo/setup-clojure@10.1
+        uses: DeLaGuardo/setup-clojure@13.4
         with:
           cli: 1.10.1.693
           clj-kondo: 2022.05.31
 
+      - name: Restore clojure cache
+        id: clj-restore
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ~/.m2/repository
+            ~/.gitlibs
+            ~/.clojure
+            .cpcache
+          key: cljdeps-${{ runner.os }}-${{ hashFiles('deps.edn') }}-${{ steps.setup-clj.outputs.cli }}
+          restore-keys: |
+            cljdeps-${{ runner.os }}-
+            cljdeps-
+
       - name: Build
-        shell: bash
+        working-directory: babel
         run: |
-          cd babel
-          npm i
+          npm ci
           clojure -M:build
 
       - name: Run tests
-        shell: bash
-        run: |
-          cd babel
-          clojure -M:test
+        working-directory: babel
+        run: clojure -M:test
+
+      - name: Save clojure cache
+        if: always()
+        continue-on-error: true
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            ~/.m2/repository
+            ~/.gitlibs
+            ~/.clojure
+            .cpcache
+          key: cljdeps-${{ runner.os }}-${{ hashFiles('deps.edn') }}-${{ steps.setup-clj.outputs.cli }}
